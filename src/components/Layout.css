@@ -1,0 +1,30 @@
+.layout {
+  display: flex;
+  min-height: 100vh;
+}
+
+.layout__body {
+  flex: 1;
+  margin-left: var(--sidebar-width);
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: var(--bg-page);
+}
+
+.layout__main {
+  flex: 1;
+  padding: 24px 32px 40px;
+  overflow-y: auto;
+  max-width: 1440px;
+  width: 100%;
+}
+
+/* Full-screen pages (e.g. Curation) that manage their own layout */
+.layout-full {
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-page);
+}

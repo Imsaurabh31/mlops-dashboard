@@ -1,0 +1,299 @@
+/* ── Stats ── */
+.dash__stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+.dash-stat {
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.dash-stat__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.dash-stat__icon {
+  font-size: 18px;
+}
+
+.dash-stat__delta {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 999px;
+}
+
+.dash-stat__delta--up   { background: var(--accent-green-light);  color: var(--accent-green); }
+.dash-stat__delta--down { background: var(--accent-yellow-light); color: var(--accent-yellow); }
+
+.dash-stat__value {
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.1;
+}
+
+.dash-stat__label {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+/* left-border accent per color */
+.dash-stat--blue   { border-left: 3px solid var(--accent-blue); }
+.dash-stat--green  { border-left: 3px solid var(--accent-green); }
+.dash-stat--yellow { border-left: 3px solid var(--accent-yellow); }
+.dash-stat--purple { border-left: 3px solid var(--accent-purple); }
+
+/* ── Two-column layout ── */
+.dash__cols {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 20px;
+  align-items: start;
+}
+
+.dash__section {
+  margin-bottom: 20px;
+}
+
+.dash__section-hd {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.dash__section-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+/* ── Quick Actions ── */
+.dash__actions {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.action-card {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: left;
+  border-radius: var(--radius-lg);
+  transition: box-shadow 0.15s, transform 0.15s, border-color 0.15s;
+  cursor: pointer;
+}
+
+.action-card:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+  border-color: var(--accent-blue-mid);
+}
+
+.action-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.action-card__icon {
+  font-size: 20px;
+}
+
+.action-card__title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.action-card__desc {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.55;
+  flex: 1;
+}
+
+.action-card__cta {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent-blue);
+}
+
+/* ── User cell ── */
+.dash__user-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dash__user-avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--accent-blue-light);
+  color: var(--accent-blue);
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* ── Pipeline ── */
+.dash__pipeline {
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.dash__pipeline-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.dash__pipeline-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.dash__pipeline-label {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+
+.dash__pipeline-pct {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+/* ── System status ── */
+.dash__status-list {
+  padding: 6px 0;
+}
+
+.dash__status-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 18px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.dash__status-row:last-child {
+  border-bottom: none;
+}
+
+.dash__status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.dash__status-dot--green { background: var(--accent-green); box-shadow: 0 0 0 3px var(--accent-green-light); }
+.dash__status-dot--red   { background: var(--accent-red);   box-shadow: 0 0 0 3px var(--accent-red-light); }
+
+.dash__status-name {
+  flex: 1;
+}
+
+/* ── Storage donut ── */
+.dash__storage {
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.dash__storage-ring {
+  position: relative;
+  width: 80px;
+  height: 80px;
+  flex-shrink: 0;
+}
+
+.dash__ring-svg {
+  width: 80px;
+  height: 80px;
+  transform: rotate(-90deg);
+}
+
+.dash__ring-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.dash__ring-pct {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1;
+}
+
+.dash__ring-sub {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.dash__storage-info {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+}
+
+.dash__storage-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+
+.dash__storage-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.dash__storage-val {
+  margin-left: auto;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 12px;
+}
+
+/* ── Responsive ── */
+@media (max-width: 1100px) {
+  .dash__stats { grid-template-columns: repeat(2, 1fr); }
+  .dash__cols  { grid-template-columns: 1fr; }
+  .dash__actions { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 640px) {
+  .dash__stats   { grid-template-columns: 1fr; }
+  .dash__actions { grid-template-columns: 1fr; }
+}
