@@ -18,15 +18,13 @@ const PALETTES = [
 
 const LOCATIONS = ['Store Entrance', 'Aisle 3', 'Checkout', 'Parking Lot', 'Lobby'];
 const GENDERS   = ['Male', 'Female'];
-const AGES      = ['Adult', 'Teen', 'Child', 'Mature', 'Unknown'];
 
-/* Pre-set annotations for the already-curated images */
 const PRESET_ANN = [
-  { gender: 'M', age: '4', staff: 'N', id: 'N' },
-  { gender: 'F', age: '5', staff: 'S', id: 'Y' },
+  { gender: 'M', age: '4', staff: 'S', id: 'Y' },
+  { gender: 'F', age: '5', staff: 'N', id: 'N' },
   { gender: 'M', age: '3', staff: 'N', id: 'N' },
-  { gender: 'F', age: '4', staff: 'N', id: 'N' },
-  { gender: 'M', age: '5', staff: 'S', id: 'Y' },
+  { gender: 'F', age: '4', staff: 'S', id: 'Y' },
+  { gender: 'M', age: '5', staff: 'N', id: 'N' },
 ];
 
 const MOCK_IMAGES = Array.from({ length: 24 }, (_, i) => ({
@@ -38,49 +36,61 @@ const MOCK_IMAGES = Array.from({ length: 24 }, (_, i) => ({
   shape: i % 3,
   location: LOCATIONS[i % LOCATIONS.length],
   gender: GENDERS[i % 2],
-  timestamp: `2026-10-${String(28 - (i % 3)).padStart(2,'0')} ${String(10 + (i % 12)).padStart(2,'0')}:${String(i * 3 % 60).padStart(2,'0')}`,
+  timestamp: `2026-10-${String(28 - (i % 3)).padStart(2, '0')} ${String(10 + (i % 12)).padStart(2, '0')}:${String(i * 3 % 60).padStart(2, '0')}`,
 }));
 
+/* ── Annotation groups matching the reference design ── */
 const ANNOTATION_GROUPS = [
   {
-    field: 'gender', title: 'Gender', keys: ['M','F'],
+    field: 'gender',
+    title: 'Gender Classification',
+    icon: '👤',
     options: [
-      { key: 'M', label: 'Male',   shortcut: 'M' },
-      { key: 'F', label: 'Female', shortcut: 'F' },
+      { key: 'M', label: 'male',      shortcut: 'M', color: '#6366f1' },
+      { key: 'F', label: 'female',    shortcut: 'F', color: '#ec4899' },
+      { key: 'R', label: 'reject',    shortcut: 'X', color: '#ef4444', isReject: true },
     ],
   },
   {
-    field: 'age', title: 'Age Category', keys: ['1–5'], grid: true,
+    field: 'age',
+    title: 'Age Classification',
+    icon: '📅',
     options: [
-      { key: '1', label: 'Infant',  shortcut: '1' },
-      { key: '2', label: 'Child',   shortcut: '2' },
-      { key: '3', label: 'Teen',    shortcut: '3' },
-      { key: '4', label: 'Adult',   shortcut: '4' },
-      { key: '5', label: 'Mature',  shortcut: '5' },
-      { key: '6', label: 'Unknown', shortcut: '6' },
+      { key: '1', label: 'infant',  shortcut: '1', color: '#06b6d4' },
+      { key: '2', label: 'child',   shortcut: '2', color: '#3b82f6' },
+      { key: '3', label: 'teen',    shortcut: '3', color: '#8b5cf6' },
+      { key: '4', label: 'adult',   shortcut: '4', color: '#10b981' },
+      { key: '5', label: 'mature',  shortcut: '5', color: '#f59e0b' },
+      { key: 'R', label: 'reject',  shortcut: 'R', color: '#ef4444', isReject: true },
     ],
   },
   {
-    field: 'staff', title: 'Staff Member', keys: ['S','N'],
+    field: 'staff',
+    title: 'Staff Classification',
+    icon: '👔',
     options: [
-      { key: 'S', label: 'Yes – Staff',   shortcut: 'S' },
-      { key: 'N', label: 'No – Customer', shortcut: 'N' },
+      { key: 'S', label: 'staff',     shortcut: 'S', color: '#10b981' },
+      { key: 'N', label: 'non_staff', shortcut: 'N', color: '#6366f1' },
+      { key: 'R', label: 'reject',    shortcut: 'Z', color: '#ef4444', isReject: true },
     ],
   },
   {
-    field: 'id', title: 'ID Card Visible', keys: ['Y','N'],
+    field: 'id',
+    title: 'ID Card Visibility',
+    icon: '🪪',
     options: [
-      { key: 'Y', label: 'Yes – Visible', shortcut: 'Y' },
-      { key: 'N', label: 'No – Hidden',   shortcut: 'H' },
+      { key: 'Y', label: 'visible',     shortcut: 'V', color: '#10b981' },
+      { key: 'N', label: 'not_visible', shortcut: 'H', color: '#6366f1' },
+      { key: 'R', label: 'reject',      shortcut: 'B', color: '#ef4444', isReject: true },
     ],
   },
 ];
 
 const ANN_LABELS = {
-  gender: { M: 'Male', F: 'Female' },
-  age:    { '1':'Infant','2':'Child','3':'Teen','4':'Adult','5':'Mature','6':'Unknown' },
-  staff:  { S: 'Staff', N: 'Customer' },
-  id:     { Y: 'ID Visible', N: 'ID Hidden' },
+  gender: { M: 'Male', F: 'Female', R: 'Rejected' },
+  age:    { '1': 'Infant', '2': 'Child', '3': 'Teen', '4': 'Adult', '5': 'Mature', R: 'Rejected' },
+  staff:  { S: 'Staff', N: 'Non-staff', R: 'Rejected' },
+  id:     { Y: 'Visible', N: 'Not Visible', R: 'Rejected' },
 };
 
 /* ── Person silhouette ── */
@@ -112,25 +122,25 @@ function PersonIcon({ shape, color, size = 1 }) {
 export default function Curation() {
   const navigate = useNavigate();
 
-  const [list, setList]       = useState(() => MOCK_IMAGES.map(m => ({ ...m })));
-  const [popup, setPopup]     = useState(null);   // image currently in popup
-  const [ann, setAnn]         = useState({ gender: null, age: null, staff: null, id: null });
-  const [dark, setDark]       = useState(false);
-  const [filter, setFilter]   = useState('all'); // all | curated | pending
-  const [search, setSearch]   = useState('');
+  const [list, setList]     = useState(() => MOCK_IMAGES.map(m => ({ ...m })));
+  const [popup, setPopup]   = useState(null);
+  const [ann, setAnn]       = useState({ gender: null, age: null, staff: null, id: null });
+  const [dark, setDark]     = useState(true); // default dark like reference
+  const [filter, setFilter] = useState('all');
+  const [search, setSearch] = useState('');
 
   const curated = list.filter(i => i.curated).length;
   const pct     = Math.round((curated / list.length) * 100);
 
-  /* Apply dark class to root */
   useEffect(() => {
     document.documentElement.classList.toggle('cur-dark', dark);
     return () => document.documentElement.classList.remove('cur-dark');
   }, [dark]);
 
-  /* Keyboard shortcuts inside popup */
   const handleKey = useCallback((e) => {
     if (!popup) return;
+    if (e.key === 'Escape') { setPopup(null); return; }
+    if (e.key === 'Enter')  { saveAndNext(); return; }
     const key = e.key.toUpperCase();
     for (const g of ANNOTATION_GROUPS) {
       for (const o of g.options) {
@@ -140,8 +150,6 @@ export default function Curation() {
         }
       }
     }
-    if (e.key === 'Enter') saveAndNext();
-    if (e.key === 'Escape') setPopup(null);
   }, [popup, ann]); // eslint-disable-line
 
   useEffect(() => {
@@ -155,9 +163,7 @@ export default function Curation() {
   };
 
   const closePopup = () => setPopup(null);
-
-  const toggle = (field, key) =>
-    setAnn(p => ({ ...p, [field]: p[field] === key ? null : key }));
+  const toggle = (field, key) => setAnn(p => ({ ...p, [field]: p[field] === key ? null : key }));
 
   const saveAndNext = () => {
     if (!popup) return;
@@ -165,14 +171,22 @@ export default function Curation() {
     setList(prev => prev.map(img =>
       img.id === popup.id ? { ...img, curated: true, annotations: savedAnn } : img
     ));
-    // advance to next uncurated
     const idx  = list.findIndex(i => i.id === popup.id);
     const next = list.slice(idx + 1).find(i => !i.curated);
     if (next) { setPopup(next); setAnn({ gender: null, age: null, staff: null, id: null }); }
     else setPopup(null);
   };
 
-  /* Filtered list */
+  const acceptAll = () => {
+    // Accept VLM suggestions — auto-fill with first option of each group
+    setAnn({
+      gender: popup?.gender === 'Male' ? 'M' : 'F',
+      age: '4',
+      staff: 'N',
+      id: 'N',
+    });
+  };
+
   const filtered = list.filter(img => {
     if (filter === 'curated' && !img.curated) return false;
     if (filter === 'pending' && img.curated)  return false;
@@ -183,12 +197,12 @@ export default function Curation() {
 
   const palette = (img) => dark
     ? { bg: img.palette.dark_bg, fg: img.palette.dark_fg }
-    : { bg: img.palette.bg,      fg: img.palette.fg      };
+    : { bg: img.palette.bg,      fg: img.palette.fg };
 
   return (
     <div className={`cur${dark ? ' cur--dark' : ''}`}>
 
-      {/* ══════════ TOPBAR ══════════ */}
+      {/* ── Topbar ── */}
       <header className="cur__bar">
         <div className="cur__bar-left">
           <div className="cur__brand">
@@ -214,12 +228,7 @@ export default function Curation() {
         </div>
 
         <div className="cur__bar-right">
-          {/* Dark / Light toggle */}
-          <button
-            className="cur__theme-toggle"
-            onClick={() => setDark(d => !d)}
-            title={dark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-          >
+          <button className="cur__theme-toggle" onClick={() => setDark(d => !d)}>
             {dark ? '☀️' : '🌙'}
             <span>{dark ? 'Light' : 'Dark'}</span>
           </button>
@@ -230,27 +239,20 @@ export default function Curation() {
         </div>
       </header>
 
-      {/* ══════════ GALLERY CONTROLS ══════════ */}
+      {/* ── Gallery controls ── */}
       <div className="cur__controls">
         <div className="cur__search-wrap">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
           </svg>
-          <input
-            className="cur__search"
-            placeholder="Search by ID or location…"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
+          <input className="cur__search" placeholder="Search by ID or location…"
+            value={search} onChange={e => setSearch(e.target.value)} />
         </div>
-
         <div className="cur__filters">
           {['all', 'curated', 'pending'].map(f => (
-            <button
-              key={f}
+            <button key={f}
               className={`cur__filter-btn${filter === f ? ' cur__filter-btn--active' : ''}`}
-              onClick={() => setFilter(f)}
-            >
+              onClick={() => setFilter(f)}>
               {f === 'all'     && `All (${list.length})`}
               {f === 'curated' && `✅ Curated (${curated})`}
               {f === 'pending' && `⏳ Pending (${list.length - curated})`}
@@ -259,55 +261,39 @@ export default function Curation() {
         </div>
       </div>
 
-      {/* ══════════ GALLERY GRID ══════════ */}
+      {/* ── Gallery grid ── */}
       <div className="cur__gallery">
         {filtered.map(img => {
           const p   = palette(img);
-          const ann = img.annotations;
+          const a   = img.annotations;
           return (
-            <div
-              key={img.id}
+            <div key={img.id}
               className={`cur__card${img.curated ? ' cur__card--curated' : ''}`}
-              onClick={() => openPopup(img)}
-            >
-              {/* Image area — fully transparent, gradient shows through */}
-              <div
-                className="cur__card-img"
-                style={{
-                  background: `${p.bg}33`,
-                }}
-              >
+              onClick={() => openPopup(img)}>
+              <div className="cur__card-img" style={{ background: `${p.bg}33` }}>
                 <PersonIcon shape={img.shape} color={p.fg} size={0.7} />
-
-                {/* ✅ Annotated overlay */}
-                {img.curated && (
-                  <div className="cur__card-check">✅</div>
-                )}
-
-                {/* Hover tooltip — only for annotated images */}
-                {img.curated && ann && (
+                {img.curated && <div className="cur__card-check">✅</div>}
+                {img.curated && a && (
                   <div className="cur__card-tooltip">
                     <div className="cur__tooltip-row">
                       <span className="cur__tooltip-key">Gender</span>
-                      <span className="cur__tooltip-val">{ANN_LABELS.gender[ann.gender] || '—'}</span>
+                      <span className="cur__tooltip-val">{ANN_LABELS.gender[a.gender] || '—'}</span>
                     </div>
                     <div className="cur__tooltip-row">
                       <span className="cur__tooltip-key">Age</span>
-                      <span className="cur__tooltip-val">{ANN_LABELS.age[ann.age] || '—'}</span>
+                      <span className="cur__tooltip-val">{ANN_LABELS.age[a.age] || '—'}</span>
                     </div>
                     <div className="cur__tooltip-row">
                       <span className="cur__tooltip-key">Staff</span>
-                      <span className="cur__tooltip-val">{ANN_LABELS.staff[ann.staff] || '—'}</span>
+                      <span className="cur__tooltip-val">{ANN_LABELS.staff[a.staff] || '—'}</span>
                     </div>
                     <div className="cur__tooltip-row">
                       <span className="cur__tooltip-key">ID</span>
-                      <span className="cur__tooltip-val">{ANN_LABELS.id[ann.id] || '—'}</span>
+                      <span className="cur__tooltip-val">{ANN_LABELS.id[a.id] || '—'}</span>
                     </div>
                   </div>
                 )}
               </div>
-
-              {/* Card footer */}
               <div className="cur__card-footer">
                 <span className="cur__card-label">{img.label}</span>
                 <span className="cur__card-loc">{img.location}</span>
@@ -315,85 +301,85 @@ export default function Curation() {
             </div>
           );
         })}
-
         {filtered.length === 0 && (
-          <div className="cur__gallery-empty">
-            <span>No images match your filter</span>
-          </div>
+          <div className="cur__gallery-empty">No images match your filter</div>
         )}
       </div>
 
-      {/* ══════════ ANNOTATION POPUP ══════════ */}
+      {/* ── Annotation Popup ── */}
       {popup && (
         <div className="cur__overlay" onClick={closePopup}>
           <div className="cur__popup" onClick={e => e.stopPropagation()}>
 
-            {/* Popup header */}
-            <div className="cur__popup-hd">
-              <div className="cur__popup-title-group">
-                <span className="cur__popup-label">{popup.label}</span>
-                <span className="cur__popup-loc">📍 {popup.location}</span>
-                <span className="cur__popup-time">🕐 {popup.timestamp}</span>
+            {/* Left — image */}
+            <div className="cur__popup-img" style={{ background: `${palette(popup).bg}44` }}>
+              {/* Nav arrows */}
+              <button className="cur__popup-arrow cur__popup-arrow--left"
+                onClick={e => { e.stopPropagation(); const idx = list.findIndex(i => i.id === popup.id); if (idx > 0) openPopup(list[idx - 1]); }}>
+                ‹
+              </button>
+              <button className="cur__popup-arrow cur__popup-arrow--right"
+                onClick={e => { e.stopPropagation(); const idx = list.findIndex(i => i.id === popup.id); if (idx < list.length - 1) openPopup(list[idx + 1]); }}>
+                ›
+              </button>
+
+              <div className="cur__popup-scene">
+                <div className="cur__popup-wall"  style={{ background: palette(popup).fg + '08' }} />
+                <div className="cur__popup-floor" style={{ background: palette(popup).fg + '15' }} />
+                <div className="cur__popup-person">
+                  <PersonIcon shape={popup.shape} color={palette(popup).fg} size={1.6} />
+                </div>
+                <div className="cur__popup-bbox" style={{ borderColor: palette(popup).fg + '90' }} />
               </div>
-              <div className="cur__popup-hd-right">
-                <span className="cur__popup-nav">
+
+              {/* Image meta bottom */}
+              <div className="cur__popup-img-meta">
+                <span className="cur__popup-img-label">{popup.label}</span>
+                <span className="cur__popup-img-loc">📍 {popup.location}</span>
+                <span className="cur__popup-img-nav">
                   {list.findIndex(i => i.id === popup.id) + 1} / {list.length}
                 </span>
-                <button className="cur__popup-close" onClick={closePopup}>✕</button>
               </div>
             </div>
 
-            <div className="cur__popup-body">
-
-              {/* Image preview */}
-              <div className="cur__popup-img" style={{ background: `${palette(popup).bg}44` }}>
-                <div className="cur__popup-scene">
-                  <div className="cur__popup-wall"  style={{ background: palette(popup).fg + '08' }} />
-                  <div className="cur__popup-floor" style={{ background: palette(popup).fg + '15' }} />
-                  <div className="cur__popup-person">
-                    <PersonIcon shape={popup.shape} color={palette(popup).fg} size={1.4} />
-                  </div>
-                  <div className="cur__popup-bbox" style={{ borderColor: palette(popup).fg + '90' }} />
-                  {popup.curated && <div className="cur__popup-curated-badge">✅ Annotated</div>}
-                </div>
+            {/* Right — annotation panel */}
+            <div className="cur__popup-panel">
+              <div className="cur__popup-panel-hd">
+                <span className="cur__popup-panel-title">Annotations</span>
+                <button className="cur__popup-close" onClick={closePopup}>✕</button>
               </div>
 
-              {/* Annotation panel */}
-              <div className="cur__popup-panel">
-                <p className="cur__popup-panel-hint">
-                  Select annotations below or use keyboard shortcuts
-                </p>
-
+              <div className="cur__popup-groups">
                 {ANNOTATION_GROUPS.map(g => (
                   <div key={g.field} className="cur__popup-group">
                     <div className="cur__popup-group-hd">
+                      <span className="cur__popup-group-icon">{g.icon}</span>
                       <span className="cur__popup-group-title">{g.title}</span>
-                      <div className="cur__popup-keys">
-                        {g.keys.map(k => <span key={k} className="cur__kbdkey">{k}</span>)}
-                      </div>
                     </div>
-                    <div className={`cur__popup-opts${g.grid ? ' cur__popup-opts--grid' : ''}`}>
+                    <div className="cur__popup-opts">
                       {g.options.map(o => (
                         <button
                           key={o.key}
-                          className={`cur__popup-opt${ann[g.field] === o.key ? ' cur__popup-opt--active' : ''}`}
+                          className={`cur__popup-opt${ann[g.field] === o.key ? ' cur__popup-opt--active' : ''}${o.isReject ? ' cur__popup-opt--reject' : ''}`}
+                          style={{ '--opt-color': o.color }}
                           onClick={() => toggle(g.field, o.key)}
                         >
-                          <span className="cur__popup-opt-label">{o.label}</span>
-                          <span className="cur__kbdkey cur__kbdkey--sm">{o.shortcut}</span>
+                          {o.label}
                         </button>
                       ))}
                     </div>
                   </div>
                 ))}
+              </div>
 
-                <div className="cur__popup-actions">
-                  <button className="cur__popup-skip" onClick={closePopup}>Skip</button>
-                  <button className="cur__popup-save" onClick={saveAndNext}>
-                    Save &amp; Next
-                    <span className="cur__kbdkey cur__kbdkey--dark">Enter</span>
-                  </button>
-                </div>
+              {/* Action buttons */}
+              <div className="cur__popup-actions">
+                <button className="cur__popup-save-next" onClick={saveAndNext}>
+                  Save &amp; next →
+                </button>
+                <button className="cur__popup-accept-all" onClick={acceptAll}>
+                  Accept all suggestions ✓
+                </button>
               </div>
             </div>
           </div>
