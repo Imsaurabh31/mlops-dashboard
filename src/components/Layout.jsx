@@ -4,11 +4,13 @@ import Topbar from './Topbar';
 import './Layout.css';
 
 // Pages that manage their own full-screen layout
-const FULLSCREEN_PAGES = ['/curation'];
+// Use startsWith so /curation/ with trailing slash also matches
+const isFullscreenPath = (pathname) =>
+  pathname === '/curation' || pathname.startsWith('/curation/');
 
 export default function Layout({ children }) {
   const { pathname } = useLocation();
-  const isFullscreen = FULLSCREEN_PAGES.includes(pathname);
+  const isFullscreen = isFullscreenPath(pathname);
 
   if (isFullscreen) {
     return <div className="layout-full">{children}</div>;

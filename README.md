@@ -1,122 +1,107 @@
 # OLY VISION — MLOps Dashboard
 
-A recreation of the OLY VISION MLOps Dashboard built with **React + Vite**. This is Stage 1 of the MLOps platform rebuild.
+A **frontend UI prototype** recreating the OLY VISION MLOps Dashboard, built with React 18 + Vite 5 + React Router 6.
+
+> **Note:** This is a UI prototype with no backend, no authentication and no persistence. All data is mocked. Stage 2 training is a browser-side simulation (Math.random + timers), not a real ML pipeline. See the roadmap below for what needs to be built.
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
 ```bash
-# Install dependencies
 npm install
-
-# Start development server
-npm run dev
-
-# Build for production
-npm run build
+npm run dev       # http://localhost:5173
+npm run build     # production build
 ```
 
-Open [http://localhost:5173](http://localhost:5173) in your browser.
+---
+
+## What is real vs simulated
+
+| Feature | Status |
+|---|---|
+| Dashboard UI, navigation, layout | ✅ Real UI |
+| Curation gallery, annotation popup, filters | ✅ Real UI |
+| Admin CRUD (create/edit/delete batches) | ✅ Real UI (no persistence) |
+| Training page auto-trigger at 80% threshold | ⚠️ Simulated (local timer, not connected to Curation) |
+| Epoch metrics, loss/accuracy charts | ⚠️ Simulated (Math.random interpolation) |
+| Training logs | ⚠️ Simulated (generated strings) |
+| Deploy button | ⚠️ UI only — no handler |
+| Authentication / roles | ❌ Decorative — no access control |
+| Persistence | ❌ State resets on navigation/refresh |
+| Real images | ❌ SVG silhouettes only |
+| VLM inference / "Accept all suggestions" | ❌ Hard-coded values |
+| Backend / API | ❌ Does not exist |
 
 ---
 
-## 📸 Pages
+## Pages
 
-### 1. Dashboard
-- Live stat cards — Total Images, Curated, Pending, Active Users
-- Quick action cards to navigate to each section
-- Recent activity table with colored status badges
-- Pipeline health bars showing model accuracy
-- System status indicators and storage donut chart
+### Dashboard
+Stat cards, quick actions, recent activity table, pipeline health bars, system status.
 
-### 2. Curation (Gallery)
-- Gallery grid layout — all images displayed at once
-- Annotated images show a ✅ overlay
-- Hover tooltip on annotated images showing Gender, Age, Staff and ID Card data
-- Click any image to open annotation popup with blurred background
-- Annotation controls for Gender, Age Category, Staff Member and ID Card Visible
-- Save & Next auto-advances to the next unannotated image
-- Search by image ID or location
-- Filter pills — All / Curated / Pending
-- Light and Dark mode toggle
-- **Apple Liquid Glass theme** — animated gradient background with frosted glass cards
+### Curation (Gallery)
+Gallery grid layout. Annotated images show ✅ overlay. Hover shows annotation tooltip. Click opens annotation popup with blurred backdrop. Requires at least one label before saving. Light/Dark mode toggle. Apple Liquid Glass theme.
 
-### 3. Admin Panel
-- 5 live stat cards that update when batches are created or deleted
-- Batch Assignments table with progress bars and color-coded statuses
-- Full CRUD — Create, Edit, Delete batches
-- Create Batch form with live validation and duplicate name check
-- User Management table with role badges and active/inactive status
-- Progress Overview with per-curator performance bars
+### Admin Panel
+Batch assignments table with progress bars. Full CRUD — create (with validation + duplicate check), edit, delete with confirmation. User management. Progress overview.
 
-### 4. Model Training
-- Model cards for Gender Classification, Age Classification and Staff Detection
-- Training simulation with animated progress bar
-- Three tabs — Training Jobs, Experiments, Deployed Models
+### Training (Stage 2)
+Auto-trigger simulation at 80% curation. Three model cards (Gender, Age, Staff) with epoch progress bars, sparklines, live metric cards, accuracy/loss SVG charts, terminal-style scrolling logs.
 
 ---
 
-## 🎨 Design System
+## Project Structure
 
-- **Theme** — IAM-style light theme with Apple Liquid Glass on Curation page
-- **Sidebar** — Dark navy fixed sidebar navigation
-- **Topbar** — White topbar with breadcrumbs, search and user info
-- **Color tokens** — All design tokens defined in `src/index.css`
-- **Shared components** — `.badge`, `.btn`, `.card`, `.tbl`, `.chip` reused across all pages
-- **Fonts** — Inter (Google Fonts)
+```
+src/
+├── components/
+│   ├── Sidebar.jsx / .css
+│   ├── Topbar.jsx / .css
+│   └── Layout.jsx / .css
+├── pages/
+│   ├── Dashboard.jsx / .css
+│   ├── Curation.jsx / .css
+│   ├── Training.jsx / .css
+│   ├── Admin.jsx / .css
+│   └── NotFound.jsx
+├── index.css          ← design tokens
+├── App.jsx            ← HashRouter + routes + 404
+└── main.jsx
+```
 
 ---
 
-## 🛠 Tech Stack
+## Tech Stack
 
 | Tool | Version |
-|------|---------|
+|---|---|
 | React | 18.3.1 |
 | Vite | 5.4.8 |
 | React Router DOM | 6.26.1 |
 
 ---
 
-## 📁 Project Structure
+## Roadmap — what needs to be built
 
-```
-src/
-├── components/
-│   ├── Sidebar.jsx / .css      ← Dark navy sidebar navigation
-│   ├── Topbar.jsx / .css       ← White topbar with breadcrumbs
-│   └── Layout.jsx / .css       ← Shared page wrapper
-├── pages/
-│   ├── Dashboard.jsx / .css    ← Main dashboard
-│   ├── Curation.jsx / .css     ← Gallery annotation tool
-│   ├── Training.jsx / .css     ← Model training page
-│   └── Admin.jsx / .css        ← Admin panel with CRUD
-├── index.css                   ← Global design tokens
-├── App.jsx                     ← Router setup
-└── main.jsx                    ← Entry point
-```
+### Before any production deployment
+- [ ] Authentication and role-based access control
+- [ ] Backend API (FastAPI / Node) with persistent database
+- [ ] Real image storage and serving
+- [ ] Replace all mocked constants with API data + loading/error states
 
----
+### Stage 3 — Model Auto Deployment
+- [ ] Real deployment pipeline triggered by accuracy threshold
+- [ ] Endpoint registry with live health monitoring
+- [ ] Rollback to previous version
+- [ ] Audit logs for deploy actions
 
-## ✅ Stage 1 Checklist
-
-- [x] Dashboard with live stats and activity feed
-- [x] Curation gallery with annotation popup
-- [x] Admin panel with full CRUD
-- [x] Model training page with simulation
-- [x] Light / Dark mode on Curation
-- [x] Apple Liquid Glass theme on Curation
-- [x] Responsive layout
+### Stage 4 — MLOps Dashboard v2
+- [ ] Real curated count driving the auto-training trigger
+- [ ] WebSocket / SSE for live training metrics from actual job runner
+- [ ] Model registry (artefacts, dataset version, lineage)
+- [ ] Data protection approach for CCTV frames (DPDP Act 2023 / GDPR)
 
 ---
 
-## 🔜 Stage 2 — Coming Next
-
-- Model auto training pipeline
-- Real-time training progress with live metrics
-- Experiment tracking
-- Auto deployment on accuracy threshold
-
----
-
-Built by **Saurabh Kumar**
+Built by **Saurabh Kumar** — Stage 1 & 2 UI prototype

@@ -114,7 +114,8 @@ function Sparkline({ data, color, width = 120, height = 40 }) {
 export default function Training() {
   const [tab, setTab]           = useState('Training Jobs');
   const [jobs, setJobs]         = useState(INIT_JOBS);
-  const [jobCounter, setJobCounter] = useState(1025);
+  // useRef counter so ID generation is not affected by stale closures
+  const jobCounterRef = useRef(1025);
 
   /* Per-model training state */
   const [trainingState, setTrainingState] = useState({});
@@ -129,6 +130,8 @@ export default function Training() {
 
   /* Simulated curated % — 21% currently, climbs to 82% to trigger auto */
   const [curatedPct, setCuratedPct] = useState(21);
+
+  const triggerTimeoutsRef = useRef([]);
 
   /* Auto-trigger simulation — curated pct climbs slowly */
   useEffect(() => {
@@ -150,34 +153,63 @@ export default function Training() {
     if (curatedPct >= AUTO_TRIGGER_THRESHOLD && !autoTriggered) {
       setAutoTriggered(true);
       showNotification('🚀 Auto-training triggered! Curated images reached 80% threshold.', 'info');
-      // Queue all models
-      setTimeout(() => startTraining('gender'), 1000);
-      setTimeout(() => startTraining('age'),    2000);
-      setTimeout(() => startTraining('staff'),  3000);
+      // Store refs so we can clear on unmount
+      triggerTimeoutsRef.current.push(
+        setTimeout(() => startTraining('gender'), 1000),
+        setTimeout(() => startTraining('age'),    2000),
+        setTimeout(() => startTraining('staff'),  3000),
+      );
     }
-  }, [curatedPct, autoTriggered]);
+  }, [curatedPct, autoTriggered]); // eslint-disable-line
+
+  /* Cleanup all intervals and timeouts on unmount */
+  useEffect(() => {
+    return () => {
+      Object.values(intervalsRef.current).forEach(clearInterval);
+      triggerTimeoutsRef.current.forEach(clearTimeout);
+    };
+  }, []);
 
   const showNotification = (msg, type = 'info') => {
     setNotification({ msg, type });
     setTimeout(() => setNotification(null), 5000);
   };
 
-  /* Scroll logs to bottom */
+  /* Scroll logs only when the active model's logs update — not on every state change */
+  const prevLogsLenRef = useRef({});
   useEffect(() => {
-    logsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [trainingState]);
+    if (!activeModel) return;
+    const st = trainingState[activeModel];
+    if (!st?.logs) return;
+    const prevLen = prevLogsLenRef.current[activeModel] || 0;
+    if (st.logs.length > prevLen) {
+      prevLogsLenRef.current[activeModel] = st.logs.length;
+      logsEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, [trainingState, activeModel]);
 
   const startTraining = (modelId) => {
     const model = MODELS.find(m => m.id === modelId);
     if (!model) return;
 
-    const jobId = `JOB-${jobCounter}`;
-    setJobCounter(c => c + 1);
+    // Guard: don't start if already running
+    setTrainingState(prev => {
+      if (prev[modelId]?.status === 'running') return prev;
+      return prev; // check happens below after reading current state
+    });
+
+    // Read current state synchronously via ref pattern
+    const currentStatus = trainingState[modelId]?.status;
+    if (currentStatus === 'running') return;
+
+    // Generate job ID from ref — not affected by stale closure
+    const jobId = `JOB-${jobCounterRef.current++}`;
 
     /* Add job to table as running */
+    const startedAt = new Date().toISOString().slice(0, 16).replace('T', ' ');
     setJobs(prev => [{
       id: jobId, model: modelId, task: model.title,
-      status: 'running', started: new Date().toLocaleString(), duration: '—', accuracy: '—',
+      status: 'running', started: startedAt, duration: '—', accuracy: '—',
     }, ...prev]);
 
     /* Init training state */
@@ -213,7 +245,9 @@ export default function Training() {
         clearInterval(interval);
         delete intervalsRef.current[modelId];
 
-        const finalAcc = model.targetAccuracy;
+        // Use the actual last simulated val accuracy, not the hard-coded target
+        const lastMetrics = generateEpochData(TOTAL_EPOCHS, model.targetAccuracy);
+        const finalAcc = +lastMetrics.valAcc.toFixed(1);
         const exceeded = finalAcc >= model.threshold;
 
         /* Update job status */

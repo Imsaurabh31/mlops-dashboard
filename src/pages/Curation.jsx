@@ -165,8 +165,18 @@ export default function Curation() {
   const closePopup = () => setPopup(null);
   const toggle = (field, key) => setAnn(p => ({ ...p, [field]: p[field] === key ? null : key }));
 
+  const [saveError, setSaveError] = useState(false);
+
   const saveAndNext = () => {
     if (!popup) return;
+    // Require at least one annotation before saving
+    const hasAnn = Object.values(ann).some(v => v !== null);
+    if (!hasAnn) {
+      setSaveError(true);
+      setTimeout(() => setSaveError(false), 2500);
+      return;
+    }
+    setSaveError(false);
     const savedAnn = { ...ann };
     setList(prev => prev.map(img =>
       img.id === popup.id ? { ...img, curated: true, annotations: savedAnn } : img
@@ -374,12 +384,19 @@ export default function Curation() {
 
               {/* Action buttons */}
               <div className="cur__popup-actions">
-                <button className="cur__popup-save-next" onClick={saveAndNext}>
-                  Save &amp; next →
-                </button>
-                <button className="cur__popup-accept-all" onClick={acceptAll}>
-                  Accept all suggestions ✓
-                </button>
+                {saveError && (
+                  <div className="cur__popup-save-error">
+                    ⚠ Select at least one annotation before saving
+                  </div>
+                )}
+                <div className="cur__popup-actions-row">
+                  <button className="cur__popup-save-next" onClick={saveAndNext}>
+                    Save &amp; next →
+                  </button>
+                  <button className="cur__popup-accept-all" onClick={acceptAll}>
+                    Accept all suggestions ✓
+                  </button>
+                </div>
               </div>
             </div>
           </div>

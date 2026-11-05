@@ -81,8 +81,8 @@ export default function Admin() {
     else if (batches.some((b) => b.name.toLowerCase() === f.name.trim().toLowerCase() && b.id !== editBatch?.id))
                                     e.name   = 'Batch name already exists';
     if (!f.client.trim())           e.client = 'Client is required';
-    if (!f.images || Number(f.images) < 1)
-                                    e.images = 'Enter a valid image count';
+    if (!f.images || !Number.isInteger(Number(f.images)) || Number(f.images) < 1)
+                                    e.images = 'Enter a valid whole number';
     return e;
   };
 
@@ -104,12 +104,17 @@ export default function Admin() {
       name:     form.name.trim(),
       client:   form.client.trim(),
       assigned: form.assignee || null,
-      images:   Number(form.images),
+      images:   Math.floor(Number(form.images)), // integer only
       pct:      0,
       status:   form.assignee ? 'in-progress' : 'unassigned',
+      _isNew:   true, // flag for highlight — cleared after animation
     };
     setBatches((prev) => [newBatch, ...prev]);
     setNextId((n) => n + 1);
+    // Clear the _isNew flag after animation completes
+    setTimeout(() => {
+      setBatches((prev) => prev.map(b => b.id === newBatch.id ? { ...b, _isNew: false } : b));
+    }, 2000);
     setShowCreate(false);
     setForm(EMPTY_FORM);
     setErrors({});
@@ -245,7 +250,7 @@ export default function Admin() {
             </thead>
             <tbody>
               {batches.map((b) => (
-                <tr key={b.id} className={b.id === nextId - 1 ? 'adm__row--new' : ''}>
+                <tr key={b.id} className={b._isNew ? 'adm__row--new' : ''}>
                   <td><span className="chip">📦 {b.name}</span></td>
                   <td style={{ fontWeight: 500, color: 'var(--text-primary)' }}>{b.client}</td>
                   <td>
