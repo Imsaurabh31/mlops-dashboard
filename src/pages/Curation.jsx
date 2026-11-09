@@ -84,12 +84,25 @@ const ANN_LABELS = {
   id:     { Y: 'Visible', N: 'Not Visible', R: 'Rejected' },
 };
 
+const EMPTY_ANN = { gender: null, age: null, staff: null, id: null };
+
+/* ── Helpers ── */
+function annEqual(a, b) {
+  return a.gender === b.gender && a.age === b.age && a.staff === b.staff && a.id === b.id;
+}
+
+function hasUnsavedChanges(currentAnn, savedAnn) {
+  /* Issue 2 fix: compare current to the image's saved labels, not just "any label set" */
+  const saved = savedAnn ?? EMPTY_ANN;
+  return !annEqual(currentAnn, saved);
+}
+
 /* ── Person silhouette ── */
 function PersonIcon({ shape, color, size = 1 }) {
   const w = Math.round(90 * size);
   const h = Math.round(120 * size);
   if (shape === 2) return (
-    <svg viewBox="0 0 80 70" fill={color} width={w} height={Math.round(80 * size)}>
+    <svg viewBox="0 0 80 70" fill={color} width={w} height={Math.round(80 * size)} aria-hidden="true">
       <circle cx="22" cy="14" r="9"/>
       <path d="M8 64c0-16 3-22 14-24v7l0-7c11 2 14 8 14 24z"/>
       <circle cx="58" cy="14" r="9"/>
@@ -97,13 +110,13 @@ function PersonIcon({ shape, color, size = 1 }) {
     </svg>
   );
   if (shape === 1) return (
-    <svg viewBox="0 0 60 70" fill={color} width={Math.round(70 * size)} height={h}>
+    <svg viewBox="0 0 60 70" fill={color} width={Math.round(70 * size)} height={h} aria-hidden="true">
       <circle cx="30" cy="15" r="8"/>
       <path d="M18 66c0-14 3-20 12-22v6l0-6c9 2 12 8 12 22z"/>
     </svg>
   );
   return (
-    <svg viewBox="0 0 60 80" fill={color} width={w} height={h}>
+    <svg viewBox="0 0 60 80" fill={color} width={w} height={h} aria-hidden="true">
       <circle cx="30" cy="16" r="11"/>
       <path d="M13 76c0-20 4-28 17-30v8l0-8c13 2 17 10 17 30z"/>
     </svg>
@@ -113,21 +126,25 @@ function PersonIcon({ shape, color, size = 1 }) {
 export default function Curation() {
   const navigate = useNavigate();
 
-  const [list, setList]         = useState(() => MOCK_IMAGES.map(m => ({ ...m })));
-  const [popup, setPopup]       = useState(null);
-  const [dark, setDark]         = useState(true);
-  const [filter, setFilter]     = useState('all');
-  const [search, setSearch]     = useState('');
+  const [list, setList]       = useState(() => MOCK_IMAGES.map(m => ({ ...m })));
+  const [popup, setPopup]     = useState(null);
+  const [dark, setDark]       = useState(true);
+  const [filter, setFilter]   = useState('all');
+  const [search, setSearch]   = useState('');
   const [saveError, setSaveError] = useState(false);
 
-  /* ── Use refs to avoid stale closures in keyboard handler ── */
-  const annRef   = useRef({ gender: null, age: null, staff: null, id: null });
-  const popupRef = useRef(null);
-  const listRef  = useRef(list);
+  /* ── Refs — avoid all stale closures ── */
+  const annRef        = useRef(EMPTY_ANN);
+  const popupRef      = useRef(null);
+  const listRef       = useRef(list);
+  /* Issue 1: ref to first focusable element in popup for focus trap */
+  const firstFocusRef = useRef(null);
+  const lastFocusRef  = useRef(null);
+  /* Remember which gallery card triggered the popup so we can restore focus */
+  const triggerRef    = useRef(null);
 
-  const [ann, setAnnState] = useState({ gender: null, age: null, staff: null, id: null });
+  const [ann, setAnnState] = useState(EMPTY_ANN);
 
-  /* Keep refs in sync */
   const setAnn = useCallback((updater) => {
     setAnnState(prev => {
       const next = typeof updater === 'function' ? updater(prev) : updater;
@@ -142,31 +159,56 @@ export default function Curation() {
   const curated = list.filter(i => i.curated).length;
   const pct     = Math.round((curated / list.length) * 100);
 
-  /* ── Dark mode class on html element ── */
+  /* ── Dark mode ── */
   useEffect(() => {
     document.documentElement.classList.toggle('cur-dark', dark);
     return () => document.documentElement.classList.remove('cur-dark');
   }, [dark]);
 
-  /* ── Keyboard handler — uses refs, no stale closures ── */
+  /* ── Issue 1: Focus trap inside popup ── */
+  useEffect(() => {
+    if (!popup) return;
+
+    /* Move focus into the popup on open */
+    const raf = requestAnimationFrame(() => {
+      firstFocusRef.current?.focus();
+    });
+
+    return () => cancelAnimationFrame(raf);
+  }, [popup]);
+
+  /* ── Keyboard handler — no stale closures via refs ── */
   const handleKey = useCallback((e) => {
     const currentPopup = popupRef.current;
     if (!currentPopup) return;
 
-    if (e.key === 'Escape') {
-      const hasAnn = Object.values(annRef.current).some(v => v !== null);
-      if (hasAnn) {
-        /* Warn before discarding unsaved selections */
-        if (window.confirm('You have unsaved annotations. Discard and close?')) {
-          setPopup(null);
-        }
+    /* Issue 1: Tab trapping */
+    if (e.key === 'Tab') {
+      const focusables = document
+        .querySelector('.cur__popup')
+        ?.querySelectorAll('button:not([disabled]), [tabindex]:not([tabindex="-1"])') ?? [];
+      if (!focusables.length) return;
+      const first = focusables[0];
+      const last  = focusables[focusables.length - 1];
+      if (e.shiftKey) {
+        if (document.activeElement === first) { e.preventDefault(); last.focus(); }
       } else {
-        setPopup(null);
+        if (document.activeElement === last)  { e.preventDefault(); first.focus(); }
       }
       return;
     }
 
-    if (e.key === 'Enter') { doSaveAndNext(); return; }
+    if (e.key === 'Escape') {
+      tryClose();
+      return;
+    }
+
+    if (e.key === 'Enter') {
+      /* Don't intercept Enter if a button inside the popup has focus */
+      if (document.activeElement?.closest('.cur__popup')) return;
+      doSaveAndNext();
+      return;
+    }
 
     const key = e.key.toUpperCase();
     for (const g of ANNOTATION_GROUPS) {
@@ -177,42 +219,47 @@ export default function Curation() {
         }
       }
     }
-  }, []); // no deps — uses refs only, no stale closures
+  }, []); // stable — uses only refs
 
   useEffect(() => {
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
   }, [handleKey]);
 
-  const openPopup = (img) => {
+  /* ── Open / close ── */
+  const openPopup = (img, triggerEl) => {
+    triggerRef.current = triggerEl ?? null;
     setPopup(img);
-    const initial = img.annotations
-      ? { ...img.annotations }
-      : { gender: null, age: null, staff: null, id: null };
+    const initial = img.annotations ? { ...img.annotations } : { ...EMPTY_ANN };
     setAnn(initial);
     setSaveError(false);
   };
 
-  /* ── Warn when closing popup with unsaved selections ── */
-  const closePopup = () => {
-    const hasAnn = Object.values(annRef.current).some(v => v !== null);
-    const alreadyCurated = popupRef.current?.curated;
-    if (hasAnn && !alreadyCurated) {
-      if (!window.confirm('You have unsaved annotations. Discard and close?')) return;
+  /* Issue 2 fix: only warn if current selections differ from the image's saved labels */
+  const tryClose = () => {
+    const current = annRef.current;
+    const saved   = popupRef.current?.annotations ?? null;
+    if (hasUnsavedChanges(current, saved)) {
+      if (!window.confirm('You have unsaved changes. Discard and close?')) return;
     }
-    setPopup(null);
+    closePopup();
   };
 
-  /* ── Close via backdrop — same unsaved warning ── */
+  const closePopup = () => {
+    setPopup(null);
+    /* Issue 1: restore focus to the card that opened the popup */
+    setTimeout(() => triggerRef.current?.focus(), 0);
+  };
+
   const closeViaBackdrop = (e) => {
-    if (e.target === e.currentTarget) closePopup();
+    if (e.target === e.currentTarget) tryClose();
   };
 
   const toggle = (field, key) =>
     setAnn(p => ({ ...p, [field]: p[field] === key ? null : key }));
 
-  /* ── Save & Next — uses ref for current ann to avoid stale closure ── */
-  const doSaveAndNext = () => {
+  /* ── Save & Next — all from refs ── */
+  const doSaveAndNext = useCallback(() => {
     const currentPopup = popupRef.current;
     const currentAnn   = annRef.current;
     if (!currentPopup) return;
@@ -239,11 +286,11 @@ export default function Curation() {
     if (next) {
       openPopup(next);
     } else {
-      setPopup(null);
+      closePopup();
     }
-  };
+  }, []); // stable
 
-  /* Accept all suggestions — fills defaults (VLM placeholder) */
+  /* ── Accept all suggestions ── */
   const acceptAll = () => {
     setAnn({
       gender: popup?.gender === 'Male' ? 'M' : 'F',
@@ -253,6 +300,7 @@ export default function Curation() {
     });
   };
 
+  /* ── Filtered list ── */
   const filtered = list.filter(img => {
     if (filter === 'curated' && !img.curated) return false;
     if (filter === 'pending' && img.curated)  return false;
@@ -272,7 +320,7 @@ export default function Curation() {
       <header className="cur__bar">
         <div className="cur__bar-left">
           <div className="cur__brand">
-            <div className="cur__brand-icon">
+            <div className="cur__brand-icon" aria-hidden="true">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
                 <circle cx="12" cy="12" r="10" stroke="#fff" strokeWidth="2"/>
                 <path d="M8 12l3 3 5-5" stroke="#60a5fa" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
@@ -286,20 +334,21 @@ export default function Curation() {
 
         <div className="cur__bar-center">
           <span className="cur__stat-label">Curated</span>
-          <span className="cur__stat-badge">{curated} / {list.length}</span>
-          <div className="cur__bar-prog-wrap">
+          <span className="cur__stat-badge" aria-live="polite">{curated} / {list.length}</span>
+          <div className="cur__bar-prog-wrap" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
             <div className="cur__bar-prog-fill" style={{ width: `${pct}%` }} />
           </div>
           <span className="cur__stat-pct">{pct}%</span>
         </div>
 
         <div className="cur__bar-right">
-          <button className="cur__theme-toggle" onClick={() => setDark(d => !d)}>
+          <button className="cur__theme-toggle" onClick={() => setDark(d => !d)}
+            aria-label={dark ? 'Switch to light mode' : 'Switch to dark mode'}>
             {dark ? '☀️' : '🌙'}
             <span>{dark ? 'Light' : 'Dark'}</span>
           </button>
-          <div className="cur__bar-user">
-            <div className="cur__bar-avatar">A</div>
+          <div className="cur__bar-user" aria-label="Signed in as admin">
+            <div className="cur__bar-avatar" aria-hidden="true">A</div>
             <span className="cur__bar-name">admin</span>
           </div>
         </div>
@@ -308,25 +357,24 @@ export default function Curation() {
       {/* ── Gallery controls ── */}
       <div className="cur__controls">
         <div className="cur__search-wrap">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
             <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
           </svg>
           <input
+            id="gallery-search"
             className="cur__search"
             placeholder="Search by ID or location…"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            aria-label="Search images"
+            aria-label="Search images by ID or location"
           />
         </div>
         <div className="cur__filters" role="group" aria-label="Filter images">
           {['all', 'curated', 'pending'].map(f => (
-            <button
-              key={f}
+            <button key={f}
               className={`cur__filter-btn${filter === f ? ' cur__filter-btn--active' : ''}`}
               onClick={() => setFilter(f)}
-              aria-pressed={filter === f}
-            >
+              aria-pressed={filter === f}>
               {f === 'all'     && `All (${list.length})`}
               {f === 'curated' && `✅ Curated (${curated})`}
               {f === 'pending' && `⏳ Pending (${list.length - curated})`}
@@ -335,55 +383,55 @@ export default function Curation() {
         </div>
       </div>
 
-      {/* ── Gallery grid — buttons for keyboard accessibility ── */}
-      <div className="cur__gallery" role="list">
+      {/* ── Gallery grid ── */}
+      {/* Issue 1 fix: ul > li > button is valid HTML and preserves button role for screen readers */}
+      <ul className="cur__gallery" role="list">
         {filtered.map(img => {
           const p = palette(img);
           const a = img.annotations;
           return (
-            /* button instead of div — keyboard reachable with Tab + Enter */
-            <button
-              key={img.id}
-              role="listitem"
-              className={`cur__card${img.curated ? ' cur__card--curated' : ''}`}
-              onClick={() => openPopup(img)}
-              aria-label={`${img.label} — ${img.location}${img.curated ? ' (annotated)' : ' (pending)'}`}
-            >
-              <div className="cur__card-img" style={{ background: `${p.bg}33` }}>
-                <PersonIcon shape={img.shape} color={p.fg} size={0.7} />
-                {img.curated && <div className="cur__card-check" aria-hidden="true">✅</div>}
-                {img.curated && a && (
-                  <div className="cur__card-tooltip" role="tooltip">
-                    <div className="cur__tooltip-row">
-                      <span className="cur__tooltip-key">Gender</span>
-                      <span className="cur__tooltip-val">{ANN_LABELS.gender[a.gender] || '—'}</span>
+            <li key={img.id} role="listitem">
+              <button
+                className={`cur__card${img.curated ? ' cur__card--curated' : ''}`}
+                onClick={e => openPopup(img, e.currentTarget)}
+                aria-label={`${img.label} — ${img.location}${img.curated ? ' (annotated)' : ' (pending)'}`}
+              >
+                <div className="cur__card-img" style={{ background: `${p.bg}33` }}>
+                  <PersonIcon shape={img.shape} color={p.fg} size={0.7} />
+                  {img.curated && <div className="cur__card-check" aria-hidden="true">✅</div>}
+                  {img.curated && a && (
+                    <div className="cur__card-tooltip" role="tooltip">
+                      <div className="cur__tooltip-row">
+                        <span className="cur__tooltip-key">Gender</span>
+                        <span className="cur__tooltip-val">{ANN_LABELS.gender[a.gender] || '—'}</span>
+                      </div>
+                      <div className="cur__tooltip-row">
+                        <span className="cur__tooltip-key">Age</span>
+                        <span className="cur__tooltip-val">{ANN_LABELS.age[a.age] || '—'}</span>
+                      </div>
+                      <div className="cur__tooltip-row">
+                        <span className="cur__tooltip-key">Staff</span>
+                        <span className="cur__tooltip-val">{ANN_LABELS.staff[a.staff] || '—'}</span>
+                      </div>
+                      <div className="cur__tooltip-row">
+                        <span className="cur__tooltip-key">ID</span>
+                        <span className="cur__tooltip-val">{ANN_LABELS.id[a.id] || '—'}</span>
+                      </div>
                     </div>
-                    <div className="cur__tooltip-row">
-                      <span className="cur__tooltip-key">Age</span>
-                      <span className="cur__tooltip-val">{ANN_LABELS.age[a.age] || '—'}</span>
-                    </div>
-                    <div className="cur__tooltip-row">
-                      <span className="cur__tooltip-key">Staff</span>
-                      <span className="cur__tooltip-val">{ANN_LABELS.staff[a.staff] || '—'}</span>
-                    </div>
-                    <div className="cur__tooltip-row">
-                      <span className="cur__tooltip-key">ID</span>
-                      <span className="cur__tooltip-val">{ANN_LABELS.id[a.id] || '—'}</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-              <div className="cur__card-footer">
-                <span className="cur__card-label">{img.label}</span>
-                <span className="cur__card-loc">{img.location}</span>
-              </div>
-            </button>
+                  )}
+                </div>
+                <div className="cur__card-footer">
+                  <span className="cur__card-label">{img.label}</span>
+                  <span className="cur__card-loc">{img.location}</span>
+                </div>
+              </button>
+            </li>
           );
         })}
         {filtered.length === 0 && (
-          <div className="cur__gallery-empty">No images match your filter</div>
+          <li className="cur__gallery-empty">No images match your filter</li>
         )}
-      </div>
+      </ul>
 
       {/* ── Annotation Popup ── */}
       {popup && (
@@ -399,6 +447,7 @@ export default function Curation() {
             {/* Left — image */}
             <div className="cur__popup-img" style={{ background: `${palette(popup).bg}44` }}>
               <button
+                ref={firstFocusRef}
                 className="cur__popup-arrow cur__popup-arrow--left"
                 aria-label="Previous image"
                 onClick={e => {
@@ -423,7 +472,7 @@ export default function Curation() {
                 <div className="cur__popup-person">
                   <PersonIcon shape={popup.shape} color={palette(popup).fg} size={1.6} />
                 </div>
-                <div className="cur__popup-bbox" style={{ borderColor: palette(popup).fg + '90' }} />
+                <div className="cur__popup-bbox" style={{ borderColor: palette(popup).fg + '90' }} aria-hidden="true"/>
               </div>
 
               <div className="cur__popup-img-meta">
@@ -438,22 +487,22 @@ export default function Curation() {
             {/* Right — annotation panel */}
             <div className="cur__popup-panel">
               <div className="cur__popup-panel-hd">
-                <span className="cur__popup-panel-title">Annotations</span>
+                <span className="cur__popup-panel-title" id="popup-title">Annotations</span>
                 <button
                   className="cur__popup-close"
-                  onClick={closePopup}
+                  onClick={tryClose}
                   aria-label="Close annotation popup"
                 >✕</button>
               </div>
 
-              <div className="cur__popup-groups">
+              <div className="cur__popup-groups" aria-labelledby="popup-title">
                 {ANNOTATION_GROUPS.map(g => (
                   <div key={g.field} className="cur__popup-group">
                     <div className="cur__popup-group-hd">
                       <span className="cur__popup-group-icon" aria-hidden="true">{g.icon}</span>
-                      <span className="cur__popup-group-title">{g.title}</span>
+                      <span className="cur__popup-group-title" id={`group-${g.field}`}>{g.title}</span>
                     </div>
-                    <div className="cur__popup-opts" role="group" aria-label={g.title}>
+                    <div className="cur__popup-opts" role="group" aria-labelledby={`group-${g.field}`}>
                       {g.options.map(o => (
                         <button
                           key={o.key}
@@ -481,7 +530,11 @@ export default function Curation() {
                   <button className="cur__popup-save-next" onClick={doSaveAndNext}>
                     Save &amp; next →
                   </button>
-                  <button className="cur__popup-accept-all" onClick={acceptAll}>
+                  <button
+                    ref={lastFocusRef}
+                    className="cur__popup-accept-all"
+                    onClick={acceptAll}
+                  >
                     Accept all suggestions ✓
                   </button>
                 </div>

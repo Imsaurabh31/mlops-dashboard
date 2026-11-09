@@ -343,7 +343,7 @@
   box-shadow: 0 4px 14px rgba(37,99,235,0.4);
 }
 
-/* ══════════ GALLERY GRID ══════════ */
+/* ── Gallery grid — ul > li > button for valid HTML + screen reader compatibility ── */
 .cur__gallery {
   flex: 1;
   overflow-y: auto;
@@ -352,6 +352,8 @@
   grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
   gap: 18px;
   align-content: start;
+  list-style: none;    /* reset ul */
+  margin: 0;
 }
 
 .cur__gallery-empty {

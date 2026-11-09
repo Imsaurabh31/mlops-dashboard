@@ -164,28 +164,41 @@ export default function Admin() {
     showToast(`🗑 "${name}" deleted`, 'danger');
   };
 
-  /* ── Field helpers ── */
-  const field = (label, key, type, ph, f, setF, errs, setErrs) => (
-    <div className="adm-field" key={key}>
-      <label className="adm-field__label">{label}</label>
-      <input
-        className={`adm-field__input${errs[key] ? ' adm-field__input--error' : ''}`}
-        type={type} placeholder={ph}
-        value={f[key]}
-        onChange={(e) => {
-          setF((prev) => ({ ...prev, [key]: e.target.value }));
-          if (errs[key]) setErrs((p) => ({ ...p, [key]: '' }));
-        }}
-        required
-      />
-      {errs[key] && <span className="adm-field__error">{errs[key]}</span>}
-    </div>
-  );
+  /* ── Field helpers — label linked via htmlFor ── */
+  const field = (label, key, type, ph, f, setF, errs, setErrs) => {
+    const inputId = `adm-field-${key}-${Math.random().toString(36).slice(2,6)}`;
+    return (
+      <div className="adm-field" key={key}>
+        <label className="adm-field__label" htmlFor={inputId}>{label}</label>
+        <input
+          id={inputId}
+          className={`adm-field__input${errs[key] ? ' adm-field__input--error' : ''}`}
+          type={type} placeholder={ph}
+          value={f[key]}
+          onChange={(e) => {
+            setF((prev) => ({ ...prev, [key]: e.target.value }));
+            if (errs[key]) setErrs((p) => ({ ...p, [key]: '' }));
+          }}
+          required
+          aria-invalid={!!errs[key]}
+          aria-describedby={errs[key] ? `${inputId}-err` : undefined}
+        />
+        {errs[key] && <span id={`${inputId}-err`} className="adm-field__error" role="alert">{errs[key]}</span>}
+      </div>
+    );
+  };
 
   const assigneeSelect = (f, setF) => (
     <div className="adm-field">
-      <label className="adm-field__label">Assign To <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(optional)</span></label>
-      <select className="adm-field__input" value={f.assignee} onChange={(e) => setF((prev) => ({ ...prev, assignee: e.target.value }))}>
+      <label className="adm-field__label" htmlFor="adm-assignee">
+        Assign To <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(optional)</span>
+      </label>
+      <select
+        id="adm-assignee"
+        className="adm-field__input"
+        value={f.assignee}
+        onChange={(e) => setF((prev) => ({ ...prev, assignee: e.target.value }))}
+      >
         <option value="">— Unassigned —</option>
         {USERS.filter((u) => u.role === 'Curator').map((u) => (
           <option key={u.email} value={u.email}>{u.name} ({u.email})</option>
@@ -429,7 +442,7 @@ export default function Admin() {
           <div className="adm-modal card" onClick={(e) => e.stopPropagation()}>
             <div className="adm-modal__hd">
               <div>
-                <h3 className="adm-modal__title">Create New Batch</h3>
+                <h3 className="adm-modal__title" id="create-modal-title">Create New Batch</h3>
                 <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
                   Fill in the details below to create a new annotation batch.
                 </p>
@@ -458,7 +471,7 @@ export default function Admin() {
           <div className="adm-modal card" onClick={(e) => e.stopPropagation()}>
             <div className="adm-modal__hd">
               <div>
-                <h3 className="adm-modal__title">Edit Batch</h3>
+                <h3 className="adm-modal__title" id="edit-modal-title">Edit Batch</h3>
                 <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
                   Editing <strong>{editBatch.name}</strong>
                 </p>
