@@ -304,7 +304,13 @@ export default function Admin() {
         <div className="card" style={{ overflow: 'hidden' }}>
           <div className="adm__tbl-hd">
             <h3 className="adm__tbl-title">User Management</h3>
-            <button className="btn btn--primary btn--sm">+ Add User</button>
+            <button
+              className="btn btn--primary btn--sm"
+              onClick={() => alert('User creation will be available once the authentication backend is connected.')}
+              title="Requires backend"
+            >
+              + Add User
+            </button>
           </div>
           <table className="tbl">
             <thead>
@@ -330,8 +336,19 @@ export default function Admin() {
                   </td>
                   <td>
                     <div style={{ display: 'flex', gap: 5 }}>
-                      <button className="btn btn--ghost btn--sm">Edit</button>
-                      <button className="btn btn--ghost btn--sm">Assign</button>
+                      <button
+                        className="btn btn--ghost btn--sm"
+                        onClick={() => alert(`Edit user "${u.name}" — available once backend is connected.`)}
+                        title="Requires backend"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        className="btn btn--ghost btn--sm"
+                        onClick={() => alert(`Assign batches to "${u.name}" — use the Batch Assignments tab.`)}
+                      >
+                        Assign
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -344,53 +361,65 @@ export default function Admin() {
       {/* ══════════════════════════════════
           TAB: Progress Overview
       ══════════════════════════════════ */}
-      {tab === 'Progress Overview' && (
-        <div className="adm__progress-view">
-          <div className="card" style={{ overflow: 'hidden', marginBottom: 16 }}>
-            <div className="adm__tbl-hd">
-              <h3 className="adm__tbl-title">Curator Performance</h3>
-            </div>
-            <div className="adm__perf-list">
-              {USERS.filter((u) => u.role === 'Curator').map((u) => {
-                const pct = Math.round((u.curated / 600) * 100);
-                return (
-                  <div key={u.email} className="adm__perf-row">
-                    <div className="adm__user-cell" style={{ minWidth: 180 }}>
-                      <div className="adm__avatar">{u.name[0]}</div>
-                      <div>
-                        <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-primary)' }}>{u.name}</div>
-                        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{u.curated.toLocaleString()} images</div>
-                      </div>
-                    </div>
-                    <div className="progress-bar-wrap" style={{ flex: 1 }}>
-                      <div className="progress-bar" style={{
-                        width: `${pct}%`,
-                        background: u.active ? 'var(--accent-blue)' : 'var(--border-strong)',
-                      }} />
-                    </div>
-                    <span className="adm__perf-pct">{pct}%</span>
-                    <span className={`badge badge--${u.active ? 'green' : 'gray'}`}>{u.active ? 'Active' : 'Inactive'}</span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-          <div className="adm__summary">
-            {[
-              { label: 'Avg. per Curator',  value: '306',        sub: 'images curated',  color: 'var(--accent-blue)'   },
-              { label: 'Top Curator',        value: 'Alice Chen', sub: '500 images',      color: 'var(--accent-purple)' },
-              { label: 'Overall Progress',   value: '74.6%',      sub: '9,312 / 12,480', color: 'var(--accent-green)'  },
-              { label: 'Est. Completion',    value: '2 days',     sub: 'at current rate', color: 'var(--accent-yellow)' },
-            ].map((s) => (
-              <div key={s.label} className="adm-summary-card card">
-                <span className="adm-summary-card__label">{s.label}</span>
-                <span className="adm-summary-card__val" style={{ color: s.color }}>{s.value}</span>
-                <span className="adm-summary-card__sub">{s.sub}</span>
+      {tab === 'Progress Overview' && (() => {
+        const curators    = USERS.filter((u) => u.role === 'Curator');
+        const totalCurated = curators.reduce((s, u) => s + u.curated, 0);
+        const avgCurated  = curators.length ? Math.round(totalCurated / curators.length) : 0;
+        const topCurator  = [...curators].sort((a, b) => b.curated - a.curated)[0];
+        const totalImages = batches.reduce((s, b) => s + b.images, 0);
+        const derivedCurated = batches.reduce((s, b) => s + Math.round(b.images * b.pct / 100), 0);
+        const overallPct  = totalImages ? ((derivedCurated / totalImages) * 100).toFixed(1) : '0';
+        return (
+          <div className="adm__progress-view">
+            <div className="card" style={{ overflow: 'hidden', marginBottom: 16 }}>
+              <div className="adm__tbl-hd">
+                <h3 className="adm__tbl-title">Curator Performance</h3>
               </div>
-            ))}
+              <div className="adm__perf-list">
+                {curators.map((u) => {
+                  const pct = topCurator?.curated
+                    ? Math.round((u.curated / topCurator.curated) * 100)
+                    : 0;
+                  return (
+                    <div key={u.email} className="adm__perf-row">
+                      <div className="adm__user-cell" style={{ minWidth: 180 }}>
+                        <div className="adm__avatar">{u.name[0]}</div>
+                        <div>
+                          <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-primary)' }}>{u.name}</div>
+                          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{u.curated.toLocaleString()} images</div>
+                        </div>
+                      </div>
+                      <div className="progress-bar-wrap" style={{ flex: 1 }}>
+                        <div className="progress-bar" style={{
+                          width: `${pct}%`,
+                          background: u.active ? 'var(--accent-blue)' : 'var(--border-strong)',
+                        }} />
+                      </div>
+                      <span className="adm__perf-pct">{pct}%</span>
+                      <span className={`badge badge--${u.active ? 'green' : 'gray'}`}>{u.active ? 'Active' : 'Inactive'}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+            {/* Summary cards — all derived from live batch/user data */}
+            <div className="adm__summary">
+              {[
+                { label: 'Avg. per Curator',  value: avgCurated.toLocaleString(), sub: 'images curated',           color: 'var(--accent-blue)'   },
+                { label: 'Top Curator',        value: topCurator?.name ?? '—',    sub: `${topCurator?.curated ?? 0} images`, color: 'var(--accent-purple)' },
+                { label: 'Overall Progress',   value: `${overallPct}%`,           sub: `${derivedCurated.toLocaleString()} / ${totalImages.toLocaleString()}`, color: 'var(--accent-green)' },
+                { label: 'Active Curators',    value: curators.filter(u => u.active).length.toString(), sub: `of ${curators.length} total`, color: 'var(--accent-yellow)' },
+              ].map((s) => (
+                <div key={s.label} className="adm-summary-card card">
+                  <span className="adm-summary-card__label">{s.label}</span>
+                  <span className="adm-summary-card__val" style={{ color: s.color }}>{s.value}</span>
+                  <span className="adm-summary-card__sub">{s.sub}</span>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* ══════════════════════════════════
           MODAL: Create Batch

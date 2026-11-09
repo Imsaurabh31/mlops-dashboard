@@ -92,7 +92,14 @@ export default function Dashboard() {
           <section className="dash__section">
             <div className="dash__section-hd">
               <h2 className="dash__section-title">Recent Activity</h2>
-              <button className="btn btn--ghost btn--sm">Refresh</button>
+              {/* Refresh note: will fetch live data once API is connected */}
+              <button
+                className="btn btn--ghost btn--sm"
+                onClick={() => alert('Live activity feed will be available once the backend API is connected.')}
+                title="Coming soon — requires backend API"
+              >
+                ↻ Refresh
+              </button>
             </div>
             <div className="card" style={{ overflow: 'hidden' }}>
               <table className="tbl">

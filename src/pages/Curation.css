@@ -364,7 +364,7 @@
   font-size: 14px;
 }
 
-/* ── Gallery card — liquid glass ── */
+/* ── Gallery card — button for keyboard accessibility ── */
 .cur__card {
   background: rgba(255,255,255,0.18);
   backdrop-filter: saturate(180%) blur(20px);
@@ -380,6 +380,11 @@
   box-shadow:
     0 4px 24px rgba(31,38,135,0.10),
     inset 0 1px 0 rgba(255,255,255,0.7);
+  /* Reset button defaults */
+  font-family: inherit;
+  text-align: left;
+  padding: 0;
+  width: 100%;
 }
 
 .cur--dark .cur__card {

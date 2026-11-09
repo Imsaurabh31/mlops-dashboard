@@ -441,7 +441,12 @@ export default function Training() {
                       View Results
                     </button>
                     {st.thresholdMet && (
-                      <button className="btn btn--primary btn--sm" style={{ flex: 1, justifyContent: 'center' }}>
+                      <button
+                        className="btn btn--primary btn--sm"
+                        style={{ flex: 1, justifyContent: 'center' }}
+                        onClick={() => alert(`Deploy "${m.title}" — Stage 3 (Auto Deployment) will handle this.`)}
+                        title="Stage 3 — coming next"
+                      >
                         🚀 Deploy
                       </button>
                     )}
@@ -615,7 +620,13 @@ export default function Training() {
         <div className="card" style={{ overflow: 'hidden' }}>
           <div className="trn__tbl-hd">
             <h3 className="trn__tbl-title">Active &amp; Recent Jobs</h3>
-            <button className="btn btn--ghost btn--sm">↻ Refresh</button>
+            <button
+              className="btn btn--ghost btn--sm"
+              onClick={() => alert('Live job refresh will be available once the backend API is connected.')}
+              title="Requires backend"
+            >
+              ↻ Refresh
+            </button>
           </div>
           <table className="tbl">
             <thead><tr>
@@ -686,8 +697,23 @@ export default function Training() {
                   <td style={{ fontWeight: 700, color: 'var(--accent-green)' }}>{d.uptime}</td>
                   <td>
                     <div style={{ display: 'flex', gap: 6 }}>
-                      <button className="btn btn--ghost btn--sm">Manage</button>
-                      <button className="btn btn--danger btn--sm">Stop</button>
+                      <button
+                        className="btn btn--ghost btn--sm"
+                        onClick={() => alert(`Manage endpoint "${d.name}" — available once deployment backend is connected.`)}
+                        title="Requires backend"
+                      >
+                        Manage
+                      </button>
+                      <button
+                        className="btn btn--danger btn--sm"
+                        onClick={() => {
+                          if (window.confirm(`Stop "${d.name}"? This will take the endpoint offline.`)) {
+                            alert('Stop endpoint will be available once the deployment backend is connected.');
+                          }
+                        }}
+                      >
+                        Stop
+                      </button>
                     </div>
                   </td>
                 </tr>
