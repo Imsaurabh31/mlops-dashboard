@@ -77,7 +77,7 @@ const DEPLOYED_DATA = [
   { name: 'age-v2',    endpoint: '/api/infer/age',    latency: '25ms', req: '1.2k/hr', uptime: '99.5%' },
 ];
 
-const JOB_BADGE = { completed: 'green', running: 'blue', failed: 'red' };
+const JOB_BADGE = { completed: 'green', running: 'blue', failed: 'red', done: 'green' };
 const EXP_BADGE = { best: 'green', archived: 'gray', deployed: 'purple' };
 
 /* ── Mini sparkline ── */
@@ -113,11 +113,9 @@ export default function Training() {
   const jobCounterRef       = useRef(1025);
   const intervalsRef        = useRef({});
   const triggerTimeoutsRef  = useRef([]);
-  /* Issue 4 fix: keep trainingState in a ref so startTraining guard is never stale */
   const trainingStateRef    = useRef({});
   const prevLogsLenRef      = useRef({});
   const logsEndRef          = useRef(null);
-  const startRef            = useRef(Date.now());
 
   /* Keep trainingStateRef in sync */
   useEffect(() => { trainingStateRef.current = trainingState; }, [trainingState]);
@@ -221,10 +219,10 @@ export default function Training() {
           const durationMs = Date.now() - trainStart;
           const durationS  = (durationMs / 1000).toFixed(0);
 
-          /* Update job row */
+          /* Update job row — failed threshold → distinct status */
           setJobs(jPrev => jPrev.map(j =>
             j.id === jobId
-              ? { ...j, status: exceeded ? 'completed' : 'completed', duration: `${durationS}s`, accuracy: `${finalAcc}%` }
+              ? { ...j, status: exceeded ? 'completed' : 'failed', duration: `${durationS}s`, accuracy: `${finalAcc}%` }
               : j
           ));
 
@@ -320,7 +318,11 @@ export default function Training() {
         {MODELS.map(m => {
           const st         = getState(m.id);
           const lastMetric = st.metrics?.[st.metrics.length - 1];
-          const accHistory = st.metrics?.map(d => d.valAcc) || [];
+          const accHistory = st.metrics?.map(d => d.valAcc ?? d.val_acc) || [];
+
+          // Helper to read either camelCase (frontend sim) or snake_case (backend API)
+          const valAcc    = lastMetric ? (lastMetric.valAcc  ?? lastMetric.val_acc)  : null;
+          const valLoss   = lastMetric ? (lastMetric.valLoss ?? lastMetric.val_loss) : null;
 
           return (
             <div key={m.id}
@@ -345,9 +347,9 @@ export default function Training() {
 
               <div className="trn-card__stats">
                 {[
-                  { val: lastMetric ? `${lastMetric.valAcc}%` : `${m.targetAccuracy}%`, label: 'Val Acc' },
-                  { val: lastMetric ? lastMetric.valLoss       : '—',                    label: 'Val Loss' },
-                  { val: m.classes.length,                                                label: 'Classes' },
+                  { val: valAcc  != null ? `${valAcc}%`  : `${m.targetAccuracy}%`, label: 'Val Acc' },
+                  { val: valLoss != null ?  valLoss       : '—',                    label: 'Val Loss' },
+                  { val: m.classes.length,                                           label: 'Classes' },
                 ].map((s, i) => (
                   <div key={i} style={{ display: 'flex' }}>
                     {i > 0 && <div className="trn-card__divider"/>}
@@ -428,8 +430,8 @@ export default function Training() {
         const m          = MODELS.find(x => x.id === activeModel);
         const st         = getState(activeModel);
         const lastMetric = st.metrics?.[st.metrics.length - 1];
-        const accHistory = st.metrics?.map(d => d.valAcc)  || [];
-        const lossHistory= st.metrics?.map(d => d.valLoss) || [];
+        const accHistory = st.metrics?.map(d => d.valAcc ?? d.val_acc) || [];
+        const lossHistory= st.metrics?.map(d => d.valLoss ?? d.val_loss) || [];
 
         return (
           <div className="trn-live card">

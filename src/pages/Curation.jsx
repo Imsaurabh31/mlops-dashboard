@@ -273,13 +273,12 @@ export default function Curation() {
     setSaveError(false);
 
     const savedAnn = { ...currentAnn };
-    setList(prev => {
-      const updated = prev.map(img =>
-        img.id === currentPopup.id ? { ...img, curated: true, annotations: savedAnn } : img
-      );
-      listRef.current = updated;
-      return updated;
-    });
+    /* Fix: compute updated list first, assign to ref, then call setList */
+    const updated = listRef.current.map(img =>
+      img.id === currentPopup.id ? { ...img, curated: true, annotations: savedAnn } : img
+    );
+    listRef.current = updated;
+    setList(updated);
 
     const idx  = listRef.current.findIndex(i => i.id === currentPopup.id);
     const next = listRef.current.slice(idx + 1).find(i => !i.curated);
@@ -447,7 +446,6 @@ export default function Curation() {
             {/* Left — image */}
             <div className="cur__popup-img" style={{ background: `${palette(popup).bg}44` }}>
               <button
-                ref={firstFocusRef}
                 className="cur__popup-arrow cur__popup-arrow--left"
                 aria-label="Previous image"
                 onClick={e => {
@@ -489,6 +487,7 @@ export default function Curation() {
               <div className="cur__popup-panel-hd">
                 <span className="cur__popup-panel-title" id="popup-title">Annotations</span>
                 <button
+                  ref={firstFocusRef}
                   className="cur__popup-close"
                   onClick={tryClose}
                   aria-label="Close annotation popup"

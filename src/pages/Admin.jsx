@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { batchesApi } from '../api/client';
 import './Admin.css';
 
 /* ── Seed data ── */
@@ -37,6 +38,14 @@ export default function Admin() {
   const [tab, setTab]         = useState('Batch Assignments');
   const [batches, setBatches] = useState(SEED_BATCHES);
   const [nextId, setNextId]   = useState(7);
+  const [apiReady, setApiReady] = useState(false);
+
+  /* ── Load batches from backend on mount ── */
+  useEffect(() => {
+    batchesApi.list()
+      .then(data => { setBatches(data); setApiReady(true); })
+      .catch(() => setApiReady(false)); // fall back to seed data silently
+  }, []);
 
   /* ── Create modal ── */
   const [showCreate, setShowCreate] = useState(false);
@@ -89,7 +98,7 @@ export default function Admin() {
   /* ── Create ── */
   const openCreate = () => { setForm(EMPTY_FORM); setErrors({}); setShowCreate(true); };
 
-  const submitCreate = (e) => {
+  const submitCreate = async (e) => {
     e.preventDefault();
     const errs = validate(form);
     if (Object.keys(errs).length) {
@@ -99,26 +108,42 @@ export default function Admin() {
       return;
     }
 
-    const newBatch = {
-      id:       nextId,
-      name:     form.name.trim(),
-      client:   form.client.trim(),
-      assigned: form.assignee || null,
-      images:   Math.floor(Number(form.images)), // integer only
-      pct:      0,
-      status:   form.assignee ? 'in-progress' : 'unassigned',
-      _isNew:   true, // flag for highlight — cleared after animation
-    };
-    setBatches((prev) => [newBatch, ...prev]);
-    setNextId((n) => n + 1);
-    // Clear the _isNew flag after animation completes
-    setTimeout(() => {
-      setBatches((prev) => prev.map(b => b.id === newBatch.id ? { ...b, _isNew: false } : b));
-    }, 2000);
-    setShowCreate(false);
-    setForm(EMPTY_FORM);
-    setErrors({});
-    showToast(`✅ "${newBatch.name}" created successfully`);
+    try {
+      let newBatch;
+      if (apiReady) {
+        // Use backend API
+        newBatch = await batchesApi.create({
+          name:     form.name.trim(),
+          client:   form.client.trim(),
+          assignee: form.assignee || null,
+          images:   Math.floor(Number(form.images)),
+        });
+      } else {
+        // Offline fallback
+        newBatch = {
+          id:       nextId,
+          name:     form.name.trim(),
+          client:   form.client.trim(),
+          assigned: form.assignee || null,
+          images:   Math.floor(Number(form.images)),
+          pct:      0,
+          status:   form.assignee ? 'in-progress' : 'unassigned',
+          _isNew:   true,
+        };
+        setNextId((n) => n + 1);
+      }
+      newBatch._isNew = true;
+      setBatches((prev) => [newBatch, ...prev]);
+      setTimeout(() => {
+        setBatches((prev) => prev.map(b => b.id === newBatch.id ? { ...b, _isNew: false } : b));
+      }, 2000);
+      setShowCreate(false);
+      setForm(EMPTY_FORM);
+      setErrors({});
+      showToast(`✅ "${newBatch.name}" created successfully`);
+    } catch (err) {
+      setErrors({ name: err.message || 'Failed to create batch' });
+    }
   };
 
   /* ── Edit ── */
@@ -128,7 +153,7 @@ export default function Admin() {
     setEditErrors({});
   };
 
-  const submitEdit = (e) => {
+  const submitEdit = async (e) => {
     e.preventDefault();
     const errs = validate(editForm);
     if (Object.keys(errs).length) {
@@ -138,35 +163,50 @@ export default function Admin() {
       return;
     }
 
-    setBatches((prev) => prev.map((b) =>
-      b.id === editBatch.id
-        ? {
-            ...b,
+    try {
+      const updated = apiReady
+        ? await batchesApi.update(editBatch.id, {
+            name:     editForm.name.trim(),
+            client:   editForm.client.trim(),
+            assignee: editForm.assignee,  // empty string = unassign
+            images:   Number(editForm.images),
+          })
+        : {
+            ...editBatch,
             name:     editForm.name.trim(),
             client:   editForm.client.trim(),
             assigned: editForm.assignee || null,
             images:   Number(editForm.images),
-            status:   editForm.assignee ? (b.pct === 100 ? 'completed' : 'in-progress') : 'unassigned',
-          }
-        : b
-    ));
-    showToast(`✏️ "${editForm.name}" updated`);
-    setEditBatch(null);
+            status:   editForm.assignee ? (editBatch.pct === 100 ? 'completed' : 'in-progress') : 'unassigned',
+          };
+
+      setBatches((prev) => prev.map((b) => b.id === editBatch.id ? updated : b));
+      showToast(`✏️ "${updated.name}" updated`);
+      setEditBatch(null);
+    } catch (err) {
+      setEditErrors({ name: err.message || 'Failed to update batch' });
+    }
   };
 
   /* ── Delete ── */
   const confirmDelete = (id) => setDeletingId(id);
 
-  const doDelete = () => {
-    const name = batches.find((b) => b.id === deletingId)?.name;
-    setBatches((prev) => prev.filter((b) => b.id !== deletingId));
-    setDeletingId(null);
-    showToast(`🗑 "${name}" deleted`, 'danger');
+  const doDelete = async () => {
+    const batch = batches.find((b) => b.id === deletingId);
+    try {
+      if (apiReady) await batchesApi.delete(deletingId);
+      setBatches((prev) => prev.filter((b) => b.id !== deletingId));
+      setDeletingId(null);
+      showToast(`🗑 "${batch?.name}" deleted`, 'danger');
+    } catch (err) {
+      showToast(`❌ Delete failed: ${err.message}`, 'danger');
+      setDeletingId(null);
+    }
   };
 
-  /* ── Field helpers — label linked via htmlFor ── */
+  /* ── Field helpers — stable htmlFor using key (not random) ── */
   const field = (label, key, type, ph, f, setF, errs, setErrs) => {
-    const inputId = `adm-field-${key}-${Math.random().toString(36).slice(2,6)}`;
+    const inputId = `adm-field-${key}`;   // stable — never regenerated
     return (
       <div className="adm-field" key={key}>
         <label className="adm-field__label" htmlFor={inputId}>{label}</label>
@@ -183,7 +223,9 @@ export default function Admin() {
           aria-invalid={!!errs[key]}
           aria-describedby={errs[key] ? `${inputId}-err` : undefined}
         />
-        {errs[key] && <span id={`${inputId}-err`} className="adm-field__error" role="alert">{errs[key]}</span>}
+        {errs[key] && (
+          <span id={`${inputId}-err`} className="adm-field__error" role="alert">{errs[key]}</span>
+        )}
       </div>
     );
   };

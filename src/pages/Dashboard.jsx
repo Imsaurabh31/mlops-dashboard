@@ -1,18 +1,7 @@
 import { useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { imagesApi, batchesApi, trainingApi } from '../api/client';
 import './Dashboard.css';
-
-const STATS = [
-  { label: 'Total Images',  value: '12,480', delta: '+248 today',  deltaUp: true,  icon: '🖼',  color: 'blue'   },
-  { label: 'Curated',       value: '9,312',  delta: '74.6% done',  deltaUp: true,  icon: '✅',  color: 'green'  },
-  { label: 'Pending',       value: '3,168',  delta: '25.4% left',  deltaUp: false, icon: '⏳',  color: 'yellow' },
-  { label: 'Active Users',  value: '8',      delta: '2 online now', deltaUp: true, icon: '👥',  color: 'purple' },
-];
-
-const QUICK_ACTIONS = [
-  { icon: '✏️', label: 'Curation',       desc: 'Annotate VLM inference results',           to: '/curation', badge: '3,168 pending' },
-  { icon: '⚙️', label: 'Admin Panel',    desc: 'Manage users and batch assignments',        to: '/admin',    badge: '6 batches'    },
-  { icon: '🧠', label: 'Model Training', desc: 'Train classification models from data',     to: '/training', badge: '1 running'    },
-];
 
 const ACTIVITY = [
   { user: 'alice@oly.com',  action: 'Curated 42 images',   ref: 'Batch-007',  time: '2 min ago',  status: 'completed' },
@@ -39,6 +28,79 @@ const PIPELINE = [
 
 export default function Dashboard() {
   const navigate = useNavigate();
+
+  /* ── Live stats from backend ── */
+  const [imageStats, setImageStats] = useState(null);
+  const [batchStats, setBatchStats] = useState(null);
+  const [trainingStatus, setTrainingStatus] = useState(null);
+  const [apiError, setApiError] = useState(false);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const [imgs, batches, trn] = await Promise.all([
+          imagesApi.stats(),
+          batchesApi.list(),
+          trainingApi.status(),
+        ]);
+        setImageStats(imgs);
+        setBatchStats(batches);
+        setTrainingStatus(trn);
+      } catch {
+        setApiError(true); // fall back to mock data silently
+      }
+    };
+    load();
+  }, []);
+
+  const runningCount = trainingStatus
+    ? Object.values(trainingStatus).filter(v => v.running).length
+    : 1;
+
+  const STATS = [
+    {
+      label: 'Total Images', icon: '🖼', color: 'blue',
+      value: imageStats ? imageStats.total.toLocaleString() : '12,480',
+      delta: imageStats ? `${imageStats.pct}% curated` : '+248 today',
+      deltaUp: true,
+    },
+    {
+      label: 'Curated', icon: '✅', color: 'green',
+      value: imageStats ? imageStats.curated.toLocaleString() : '9,312',
+      delta: imageStats ? `${imageStats.pct}% done` : '74.6% done',
+      deltaUp: true,
+    },
+    {
+      label: 'Pending', icon: '⏳', color: 'yellow',
+      value: imageStats ? imageStats.pending.toLocaleString() : '3,168',
+      delta: imageStats ? `${(100 - imageStats.pct).toFixed(1)}% left` : '25.4% left',
+      deltaUp: false,
+    },
+    {
+      label: 'Active Users', icon: '👥', color: 'purple',
+      value: '8',
+      delta: '2 online now',
+      deltaUp: true,
+    },
+  ];
+
+  const QUICK_ACTIONS = [
+    {
+      icon: '✏️', label: 'Curation', desc: 'Annotate VLM inference results',
+      to: '/curation',
+      badge: imageStats ? `${imageStats.pending} pending` : '3,168 pending',
+    },
+    {
+      icon: '⚙️', label: 'Admin Panel', desc: 'Manage users and batch assignments',
+      to: '/admin',
+      badge: batchStats ? `${batchStats.length} batches` : '6 batches',
+    },
+    {
+      icon: '🧠', label: 'Model Training', desc: 'Train classification models from data',
+      to: '/training',
+      badge: `${runningCount} running`,
+    },
+  ];
 
   return (
     <div className="dash">
