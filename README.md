@@ -10,7 +10,7 @@ A **frontend UI prototype + FastAPI backend** for the OLY VISION MLOps Dashboard
 
 ### Frontend
 ```bash
-cd mlops-dashboard
+# from repo root
 npm install
 npm run dev        # http://localhost:5173
 npm run build      # production build
@@ -18,6 +18,7 @@ npm run build      # production build
 
 ### Backend
 ```bash
+# from repo root
 cd backend
 pip install -r requirements.txt
 uvicorn app.main:app --reload --port 8000
@@ -89,8 +90,8 @@ Base URL: `http://localhost:8000/api`
 ## Project Structure
 
 ```
-MLOPS/
-├── backend/                    ← FastAPI backend
+mlops-dashboard/        ← this repository
+├── backend/            ← FastAPI backend
 │   ├── app/
 │   │   ├── main.py             ← FastAPI app + CORS
 │   │   ├── models/schemas.py   ← Pydantic models
@@ -100,30 +101,30 @@ MLOPS/
 │   │   │   └── training.py     ← Job management + live logs
 │   │   └── services/
 │   │       ├── store.py        ← In-memory store (replace with DB)
+│   │       ├── script_runner.py ← Pluggable script runner
 │   │       └── training_service.py ← Background training + trigger
-│   ├── scripts/mock_training.py
+│   ├── scripts/
+│   │   └── dummy_training.py   ← Dummy script (swap for real scripts here)
 │   ├── verify.py               ← 18-test verification script
 │   └── requirements.txt
 │
-└── mlops-dashboard/            ← React + Vite frontend
-    ├── src/
-    │   ├── api/
-    │   │   ├── client.js       ← API client for all endpoints
-    │   │   └── useApi.js       ← React hooks (usePolling, useJobLogs)
-    │   ├── components/
-    │   │   ├── Sidebar.jsx / .css
-    │   │   ├── Topbar.jsx / .css
-    │   │   └── Layout.jsx / .css
-    │   ├── pages/
-    │   │   ├── Dashboard.jsx / .css
-    │   │   ├── Curation.jsx / .css
-    │   │   ├── Training.jsx / .css
-    │   │   ├── Admin.jsx / .css
-    │   │   └── NotFound.jsx
-    │   ├── index.css           ← design tokens
-    │   ├── App.jsx             ← HashRouter + routes + 404
-    │   └── main.jsx
-    └── .env                    ← VITE_API_URL=http://localhost:8000/api
+└── src/                ← React + Vite frontend
+    ├── api/
+    │   ├── client.js           ← API client for all endpoints
+    │   └── useApi.js           ← React hooks (usePolling, useJobLogs)
+    ├── components/
+    │   ├── Sidebar.jsx / .css
+    │   ├── Topbar.jsx / .css
+    │   └── Layout.jsx / .css
+    ├── pages/
+    │   ├── Dashboard.jsx / .css
+    │   ├── Curation.jsx / .css
+    │   ├── Training.jsx / .css
+    │   ├── Admin.jsx / .css
+    │   └── NotFound.jsx
+    ├── index.css               ← design tokens
+    ├── App.jsx                 ← HashRouter + routes + 404
+    └── main.jsx
 ```
 
 ---
