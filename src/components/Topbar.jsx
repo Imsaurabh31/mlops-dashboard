@@ -1,11 +1,12 @@
-import { useLocation, Link } from 'react-router-dom';
+import { useLocation, Link, useNavigate } from 'react-router-dom';
+import { useState } from 'react';
 import './Topbar.css';
 
 const PAGES = {
-  '/':         { title: 'Dashboard',     sub: 'Overview of your MLOps pipeline'         },
-  '/curation': { title: 'Curation',      sub: 'Annotate and verify VLM inference results' },
-  '/admin':    { title: 'Admin Panel',   sub: 'Manage users, batches and curator progress' },
-  '/training': { title: 'Model Training',sub: 'Train and deploy classification models'   },
+  '/':         { title: 'Dashboard',      sub: 'Overview of your MLOps pipeline'           },
+  '/curation': { title: 'Curation',       sub: 'Annotate and verify VLM inference results'  },
+  '/admin':    { title: 'Admin Panel',    sub: 'Manage users, batches and curator progress' },
+  '/training': { title: 'Model Training', sub: 'Train and deploy classification models'     },
 };
 
 const BREADCRUMBS = {
@@ -15,15 +16,41 @@ const BREADCRUMBS = {
   '/training': [{ label: 'Home', to: '/' }, { label: 'Training' }],
 };
 
+/* Quick-nav: map search terms to routes */
+const SEARCH_ROUTES = [
+  { terms: ['dashboard', 'home', 'overview'],     to: '/'         },
+  { terms: ['curation', 'annotate', 'gallery'],    to: '/curation' },
+  { terms: ['admin', 'batch', 'user'],             to: '/admin'    },
+  { terms: ['training', 'model', 'train', 'deploy'], to: '/training' },
+];
+
 export default function Topbar() {
   const { pathname } = useLocation();
-  const info  = PAGES[pathname]       || { title: 'MLOps', sub: '' };
+  const navigate     = useNavigate();
+  const [query, setQuery] = useState('');
+  const [showSuggestions, setShowSuggestions] = useState(false);
+
+  const info   = PAGES[pathname]       || { title: 'MLOps', sub: '' };
   const crumbs = BREADCRUMBS[pathname] || [{ label: 'Home', to: '/' }];
+
+  const suggestions = query.length > 0
+    ? SEARCH_ROUTES.filter(r =>
+        r.terms.some(t => t.includes(query.toLowerCase()))
+      )
+    : [];
+
+  const handleSearch = (e) => {
+    e.preventDefault();
+    if (suggestions.length > 0) {
+      navigate(suggestions[0].to);
+      setQuery('');
+      setShowSuggestions(false);
+    }
+  };
 
   return (
     <header className="topbar">
       <div className="topbar__left">
-        {/* Breadcrumb */}
         <nav className="topbar__breadcrumb" aria-label="breadcrumb">
           {crumbs.map((c, i) => (
             <span key={i} className="topbar__crumb">
@@ -35,31 +62,43 @@ export default function Topbar() {
             </span>
           ))}
         </nav>
-        {/* Page title */}
         <h1 className="topbar__title">{info.title}</h1>
         <p className="topbar__sub">{info.sub}</p>
       </div>
 
       <div className="topbar__right">
-        {/* Search */}
-        <div className="topbar__search">
+        {/* Functional search — navigates to matching page */}
+        <form className="topbar__search" onSubmit={handleSearch} style={{ position: 'relative' }}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
           </svg>
-          <input placeholder="Search…" aria-label="Search" />
-        </div>
-
-        {/* Notifications */}
-        <button className="topbar__notif" aria-label="Notifications">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/>
-          </svg>
-          <span className="topbar__notif-dot" />
-        </button>
+          <input
+            placeholder="Search pages…"
+            aria-label="Search pages"
+            value={query}
+            onChange={e => { setQuery(e.target.value); setShowSuggestions(true); }}
+            onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+            onFocus={() => query && setShowSuggestions(true)}
+          />
+          {showSuggestions && suggestions.length > 0 && (
+            <div className="topbar__suggestions">
+              {suggestions.map(s => (
+                <button
+                  key={s.to}
+                  type="button"
+                  className="topbar__suggestion"
+                  onMouseDown={() => { navigate(s.to); setQuery(''); setShowSuggestions(false); }}
+                >
+                  {s.terms[0].charAt(0).toUpperCase() + s.terms[0].slice(1)}
+                </button>
+              ))}
+            </div>
+          )}
+        </form>
 
         {/* User */}
-        <div className="topbar__user">
-          <div className="topbar__avatar">A</div>
+        <div className="topbar__user" role="status" aria-label="Signed in as admin">
+          <div className="topbar__avatar" aria-hidden="true">A</div>
           <div className="topbar__user-info">
             <span className="topbar__user-name">admin</span>
             <span className="badge badge--blue" style={{ fontSize: '10px', padding: '1px 6px' }}>ADMIN</span>

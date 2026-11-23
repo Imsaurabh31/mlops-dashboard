@@ -180,3 +180,39 @@
   color: var(--text-primary);
   line-height: 1.2;
 }
+
+/* ── Search suggestions dropdown ── */
+.topbar__suggestions {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+  z-index: 200;
+  overflow: hidden;
+}
+
+.topbar__suggestion {
+  display: block;
+  width: 100%;
+  padding: 9px 14px;
+  text-align: left;
+  background: transparent;
+  border: none;
+  font-size: 13px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.12s, color 0.12s;
+  border-bottom: 1px solid var(--border);
+}
+
+.topbar__suggestion:last-child { border-bottom: none; }
+
+.topbar__suggestion:hover {
+  background: var(--accent-blue-light);
+  color: var(--accent-blue);
+}

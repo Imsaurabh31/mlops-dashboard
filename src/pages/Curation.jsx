@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './Curation.css';
 
@@ -18,15 +18,13 @@ const PALETTES = [
 
 const LOCATIONS = ['Store Entrance', 'Aisle 3', 'Checkout', 'Parking Lot', 'Lobby'];
 const GENDERS   = ['Male', 'Female'];
-const AGES      = ['Adult', 'Teen', 'Child', 'Mature', 'Unknown'];
 
-/* Pre-set annotations for the already-curated images */
 const PRESET_ANN = [
-  { gender: 'M', age: '4', staff: 'N', id: 'N' },
-  { gender: 'F', age: '5', staff: 'S', id: 'Y' },
+  { gender: 'M', age: '4', staff: 'S', id: 'Y' },
+  { gender: 'F', age: '5', staff: 'N', id: 'N' },
   { gender: 'M', age: '3', staff: 'N', id: 'N' },
-  { gender: 'F', age: '4', staff: 'N', id: 'N' },
-  { gender: 'M', age: '5', staff: 'S', id: 'Y' },
+  { gender: 'F', age: '4', staff: 'S', id: 'Y' },
+  { gender: 'M', age: '5', staff: 'N', id: 'N' },
 ];
 
 const MOCK_IMAGES = Array.from({ length: 24 }, (_, i) => ({
@@ -38,57 +36,73 @@ const MOCK_IMAGES = Array.from({ length: 24 }, (_, i) => ({
   shape: i % 3,
   location: LOCATIONS[i % LOCATIONS.length],
   gender: GENDERS[i % 2],
-  timestamp: `2026-10-${String(28 - (i % 3)).padStart(2,'0')} ${String(10 + (i % 12)).padStart(2,'0')}:${String(i * 3 % 60).padStart(2,'0')}`,
+  timestamp: `2026-10-${String(28 - (i % 3)).padStart(2, '0')} ${String(10 + (i % 12)).padStart(2, '0')}:${String(i * 3 % 60).padStart(2, '0')}`,
 }));
 
 const ANNOTATION_GROUPS = [
   {
-    field: 'gender', title: 'Gender', keys: ['M','F'],
+    field: 'gender', title: 'Gender Classification', icon: '👤',
     options: [
-      { key: 'M', label: 'Male',   shortcut: 'M' },
-      { key: 'F', label: 'Female', shortcut: 'F' },
+      { key: 'M', label: 'male',   shortcut: 'M', color: '#6366f1' },
+      { key: 'F', label: 'female', shortcut: 'F', color: '#ec4899' },
+      { key: 'R', label: 'reject', shortcut: 'X', color: '#ef4444', isReject: true },
     ],
   },
   {
-    field: 'age', title: 'Age Category', keys: ['1–5'], grid: true,
+    field: 'age', title: 'Age Classification', icon: '📅',
     options: [
-      { key: '1', label: 'Infant',  shortcut: '1' },
-      { key: '2', label: 'Child',   shortcut: '2' },
-      { key: '3', label: 'Teen',    shortcut: '3' },
-      { key: '4', label: 'Adult',   shortcut: '4' },
-      { key: '5', label: 'Mature',  shortcut: '5' },
-      { key: '6', label: 'Unknown', shortcut: '6' },
+      { key: '1', label: 'infant',  shortcut: '1', color: '#06b6d4' },
+      { key: '2', label: 'child',   shortcut: '2', color: '#3b82f6' },
+      { key: '3', label: 'teen',    shortcut: '3', color: '#8b5cf6' },
+      { key: '4', label: 'adult',   shortcut: '4', color: '#10b981' },
+      { key: '5', label: 'mature',  shortcut: '5', color: '#f59e0b' },
+      { key: 'R', label: 'reject',  shortcut: 'R', color: '#ef4444', isReject: true },
     ],
   },
   {
-    field: 'staff', title: 'Staff Member', keys: ['S','N'],
+    field: 'staff', title: 'Staff Classification', icon: '👔',
     options: [
-      { key: 'S', label: 'Yes – Staff',   shortcut: 'S' },
-      { key: 'N', label: 'No – Customer', shortcut: 'N' },
+      { key: 'S', label: 'staff',     shortcut: 'S', color: '#10b981' },
+      { key: 'N', label: 'non_staff', shortcut: 'N', color: '#6366f1' },
+      { key: 'R', label: 'reject',    shortcut: 'Z', color: '#ef4444', isReject: true },
     ],
   },
   {
-    field: 'id', title: 'ID Card Visible', keys: ['Y','N'],
+    field: 'id', title: 'ID Card Visibility', icon: '🪪',
     options: [
-      { key: 'Y', label: 'Yes – Visible', shortcut: 'Y' },
-      { key: 'N', label: 'No – Hidden',   shortcut: 'H' },
+      { key: 'Y', label: 'visible',     shortcut: 'V', color: '#10b981' },
+      { key: 'N', label: 'not_visible', shortcut: 'H', color: '#6366f1' },
+      { key: 'R', label: 'reject',      shortcut: 'B', color: '#ef4444', isReject: true },
     ],
   },
 ];
 
 const ANN_LABELS = {
-  gender: { M: 'Male', F: 'Female' },
-  age:    { '1':'Infant','2':'Child','3':'Teen','4':'Adult','5':'Mature','6':'Unknown' },
-  staff:  { S: 'Staff', N: 'Customer' },
-  id:     { Y: 'ID Visible', N: 'ID Hidden' },
+  gender: { M: 'Male', F: 'Female', R: 'Rejected' },
+  age:    { '1': 'Infant', '2': 'Child', '3': 'Teen', '4': 'Adult', '5': 'Mature', R: 'Rejected' },
+  staff:  { S: 'Staff', N: 'Non-staff', R: 'Rejected' },
+  id:     { Y: 'Visible', N: 'Not Visible', R: 'Rejected' },
 };
+
+const EMPTY_ANN = { gender: null, age: null, staff: null, id: null };
+
+/* ── Helpers ── */
+function annEqual(a, b) {
+  return a.gender === b.gender && a.age === b.age && a.staff === b.staff && a.id === b.id;
+}
+
+function hasUnsavedChanges(currentAnn, savedAnn) {
+  /* Issue 2 fix: compare current to the image's saved labels, not just "any label set" */
+  const saved = savedAnn ?? EMPTY_ANN;
+  return !annEqual(currentAnn, saved);
+}
 
 /* ── Person silhouette ── */
 function PersonIcon({ shape, color, size = 1 }) {
   const w = Math.round(90 * size);
   const h = Math.round(120 * size);
   if (shape === 2) return (
-    <svg viewBox="0 0 80 70" fill={color} width={w} height={Math.round(80 * size)}>
+    <svg viewBox="0 0 80 70" fill={color} width={w} height={Math.round(80 * size)} aria-hidden="true">
       <circle cx="22" cy="14" r="9"/>
       <path d="M8 64c0-16 3-22 14-24v7l0-7c11 2 14 8 14 24z"/>
       <circle cx="58" cy="14" r="9"/>
@@ -96,13 +110,13 @@ function PersonIcon({ shape, color, size = 1 }) {
     </svg>
   );
   if (shape === 1) return (
-    <svg viewBox="0 0 60 70" fill={color} width={Math.round(70 * size)} height={h}>
+    <svg viewBox="0 0 60 70" fill={color} width={Math.round(70 * size)} height={h} aria-hidden="true">
       <circle cx="30" cy="15" r="8"/>
       <path d="M18 66c0-14 3-20 12-22v6l0-6c9 2 12 8 12 22z"/>
     </svg>
   );
   return (
-    <svg viewBox="0 0 60 80" fill={color} width={w} height={h}>
+    <svg viewBox="0 0 60 80" fill={color} width={w} height={h} aria-hidden="true">
       <circle cx="30" cy="16" r="11"/>
       <path d="M13 76c0-20 4-28 17-30v8l0-8c13 2 17 10 17 30z"/>
     </svg>
@@ -113,24 +127,89 @@ export default function Curation() {
   const navigate = useNavigate();
 
   const [list, setList]       = useState(() => MOCK_IMAGES.map(m => ({ ...m })));
-  const [popup, setPopup]     = useState(null);   // image currently in popup
-  const [ann, setAnn]         = useState({ gender: null, age: null, staff: null, id: null });
-  const [dark, setDark]       = useState(false);
-  const [filter, setFilter]   = useState('all'); // all | curated | pending
+  const [popup, setPopup]     = useState(null);
+  const [dark, setDark]       = useState(true);
+  const [filter, setFilter]   = useState('all');
   const [search, setSearch]   = useState('');
+  const [saveError, setSaveError] = useState(false);
+
+  /* ── Refs — avoid all stale closures ── */
+  const annRef        = useRef(EMPTY_ANN);
+  const popupRef      = useRef(null);
+  const listRef       = useRef(list);
+  /* Issue 1: ref to first focusable element in popup for focus trap */
+  const firstFocusRef = useRef(null);
+  const lastFocusRef  = useRef(null);
+  /* Remember which gallery card triggered the popup so we can restore focus */
+  const triggerRef    = useRef(null);
+
+  const [ann, setAnnState] = useState(EMPTY_ANN);
+
+  const setAnn = useCallback((updater) => {
+    setAnnState(prev => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      annRef.current = next;
+      return next;
+    });
+  }, []);
+
+  useEffect(() => { popupRef.current = popup; }, [popup]);
+  useEffect(() => { listRef.current  = list;  }, [list]);
 
   const curated = list.filter(i => i.curated).length;
   const pct     = Math.round((curated / list.length) * 100);
 
-  /* Apply dark class to root */
+  /* ── Dark mode ── */
   useEffect(() => {
     document.documentElement.classList.toggle('cur-dark', dark);
     return () => document.documentElement.classList.remove('cur-dark');
   }, [dark]);
 
-  /* Keyboard shortcuts inside popup */
-  const handleKey = useCallback((e) => {
+  /* ── Issue 1: Focus trap inside popup ── */
+  useEffect(() => {
     if (!popup) return;
+
+    /* Move focus into the popup on open */
+    const raf = requestAnimationFrame(() => {
+      firstFocusRef.current?.focus();
+    });
+
+    return () => cancelAnimationFrame(raf);
+  }, [popup]);
+
+  /* ── Keyboard handler — no stale closures via refs ── */
+  const handleKey = useCallback((e) => {
+    const currentPopup = popupRef.current;
+    if (!currentPopup) return;
+
+    /* Issue 1: Tab trapping */
+    if (e.key === 'Tab') {
+      const focusables = document
+        .querySelector('.cur__popup')
+        ?.querySelectorAll('button:not([disabled]), [tabindex]:not([tabindex="-1"])') ?? [];
+      if (!focusables.length) return;
+      const first = focusables[0];
+      const last  = focusables[focusables.length - 1];
+      if (e.shiftKey) {
+        if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+      } else {
+        if (document.activeElement === last)  { e.preventDefault(); first.focus(); }
+      }
+      return;
+    }
+
+    if (e.key === 'Escape') {
+      tryClose();
+      return;
+    }
+
+    if (e.key === 'Enter') {
+      /* Don't intercept Enter if a button inside the popup has focus */
+      if (document.activeElement?.closest('.cur__popup')) return;
+      doSaveAndNext();
+      return;
+    }
+
     const key = e.key.toUpperCase();
     for (const g of ANNOTATION_GROUPS) {
       for (const o of g.options) {
@@ -140,39 +219,87 @@ export default function Curation() {
         }
       }
     }
-    if (e.key === 'Enter') saveAndNext();
-    if (e.key === 'Escape') setPopup(null);
-  }, [popup, ann]); // eslint-disable-line
+  }, []); // stable — uses only refs
 
   useEffect(() => {
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
   }, [handleKey]);
 
-  const openPopup = (img) => {
+  /* ── Open / close ── */
+  const openPopup = (img, triggerEl) => {
+    triggerRef.current = triggerEl ?? null;
     setPopup(img);
-    setAnn(img.annotations ? { ...img.annotations } : { gender: null, age: null, staff: null, id: null });
+    const initial = img.annotations ? { ...img.annotations } : { ...EMPTY_ANN };
+    setAnn(initial);
+    setSaveError(false);
   };
 
-  const closePopup = () => setPopup(null);
+  /* Issue 2 fix: only warn if current selections differ from the image's saved labels */
+  const tryClose = () => {
+    const current = annRef.current;
+    const saved   = popupRef.current?.annotations ?? null;
+    if (hasUnsavedChanges(current, saved)) {
+      if (!window.confirm('You have unsaved changes. Discard and close?')) return;
+    }
+    closePopup();
+  };
+
+  const closePopup = () => {
+    setPopup(null);
+    /* Issue 1: restore focus to the card that opened the popup */
+    setTimeout(() => triggerRef.current?.focus(), 0);
+  };
+
+  const closeViaBackdrop = (e) => {
+    if (e.target === e.currentTarget) tryClose();
+  };
 
   const toggle = (field, key) =>
     setAnn(p => ({ ...p, [field]: p[field] === key ? null : key }));
 
-  const saveAndNext = () => {
-    if (!popup) return;
-    const savedAnn = { ...ann };
-    setList(prev => prev.map(img =>
-      img.id === popup.id ? { ...img, curated: true, annotations: savedAnn } : img
-    ));
-    // advance to next uncurated
-    const idx  = list.findIndex(i => i.id === popup.id);
-    const next = list.slice(idx + 1).find(i => !i.curated);
-    if (next) { setPopup(next); setAnn({ gender: null, age: null, staff: null, id: null }); }
-    else setPopup(null);
+  /* ── Save & Next — all from refs ── */
+  const doSaveAndNext = useCallback(() => {
+    const currentPopup = popupRef.current;
+    const currentAnn   = annRef.current;
+    if (!currentPopup) return;
+
+    const hasAnn = Object.values(currentAnn).some(v => v !== null);
+    if (!hasAnn) {
+      setSaveError(true);
+      setTimeout(() => setSaveError(false), 2500);
+      return;
+    }
+    setSaveError(false);
+
+    const savedAnn = { ...currentAnn };
+    /* Fix: compute updated list first, assign to ref, then call setList */
+    const updated = listRef.current.map(img =>
+      img.id === currentPopup.id ? { ...img, curated: true, annotations: savedAnn } : img
+    );
+    listRef.current = updated;
+    setList(updated);
+
+    const idx  = listRef.current.findIndex(i => i.id === currentPopup.id);
+    const next = listRef.current.slice(idx + 1).find(i => !i.curated);
+    if (next) {
+      openPopup(next);
+    } else {
+      closePopup();
+    }
+  }, []); // stable
+
+  /* ── Accept all suggestions ── */
+  const acceptAll = () => {
+    setAnn({
+      gender: popup?.gender === 'Male' ? 'M' : 'F',
+      age:    '4',
+      staff:  'N',
+      id:     'N',
+    });
   };
 
-  /* Filtered list */
+  /* ── Filtered list ── */
   const filtered = list.filter(img => {
     if (filter === 'curated' && !img.curated) return false;
     if (filter === 'pending' && img.curated)  return false;
@@ -183,16 +310,16 @@ export default function Curation() {
 
   const palette = (img) => dark
     ? { bg: img.palette.dark_bg, fg: img.palette.dark_fg }
-    : { bg: img.palette.bg,      fg: img.palette.fg      };
+    : { bg: img.palette.bg,      fg: img.palette.fg };
 
   return (
     <div className={`cur${dark ? ' cur--dark' : ''}`}>
 
-      {/* ══════════ TOPBAR ══════════ */}
+      {/* ── Topbar ── */}
       <header className="cur__bar">
         <div className="cur__bar-left">
           <div className="cur__brand">
-            <div className="cur__brand-icon">
+            <div className="cur__brand-icon" aria-hidden="true">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
                 <circle cx="12" cy="12" r="10" stroke="#fff" strokeWidth="2"/>
                 <path d="M8 12l3 3 5-5" stroke="#60a5fa" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
@@ -206,51 +333,47 @@ export default function Curation() {
 
         <div className="cur__bar-center">
           <span className="cur__stat-label">Curated</span>
-          <span className="cur__stat-badge">{curated} / {list.length}</span>
-          <div className="cur__bar-prog-wrap">
+          <span className="cur__stat-badge" aria-live="polite">{curated} / {list.length}</span>
+          <div className="cur__bar-prog-wrap" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
             <div className="cur__bar-prog-fill" style={{ width: `${pct}%` }} />
           </div>
           <span className="cur__stat-pct">{pct}%</span>
         </div>
 
         <div className="cur__bar-right">
-          {/* Dark / Light toggle */}
-          <button
-            className="cur__theme-toggle"
-            onClick={() => setDark(d => !d)}
-            title={dark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-          >
+          <button className="cur__theme-toggle" onClick={() => setDark(d => !d)}
+            aria-label={dark ? 'Switch to light mode' : 'Switch to dark mode'}>
             {dark ? '☀️' : '🌙'}
             <span>{dark ? 'Light' : 'Dark'}</span>
           </button>
-          <div className="cur__bar-user">
-            <div className="cur__bar-avatar">A</div>
+          <div className="cur__bar-user" aria-label="Signed in as admin">
+            <div className="cur__bar-avatar" aria-hidden="true">A</div>
             <span className="cur__bar-name">admin</span>
           </div>
         </div>
       </header>
 
-      {/* ══════════ GALLERY CONTROLS ══════════ */}
+      {/* ── Gallery controls ── */}
       <div className="cur__controls">
         <div className="cur__search-wrap">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
             <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
           </svg>
           <input
+            id="gallery-search"
             className="cur__search"
             placeholder="Search by ID or location…"
             value={search}
             onChange={e => setSearch(e.target.value)}
+            aria-label="Search images by ID or location"
           />
         </div>
-
-        <div className="cur__filters">
+        <div className="cur__filters" role="group" aria-label="Filter images">
           {['all', 'curated', 'pending'].map(f => (
-            <button
-              key={f}
+            <button key={f}
               className={`cur__filter-btn${filter === f ? ' cur__filter-btn--active' : ''}`}
               onClick={() => setFilter(f)}
-            >
+              aria-pressed={filter === f}>
               {f === 'all'     && `All (${list.length})`}
               {f === 'curated' && `✅ Curated (${curated})`}
               {f === 'pending' && `⏳ Pending (${list.length - curated})`}
@@ -259,139 +382,159 @@ export default function Curation() {
         </div>
       </div>
 
-      {/* ══════════ GALLERY GRID ══════════ */}
-      <div className="cur__gallery">
+      {/* ── Gallery grid ── */}
+      {/* Issue 1 fix: ul > li > button is valid HTML and preserves button role for screen readers */}
+      <ul className="cur__gallery" role="list">
         {filtered.map(img => {
-          const p   = palette(img);
-          const ann = img.annotations;
+          const p = palette(img);
+          const a = img.annotations;
           return (
-            <div
-              key={img.id}
-              className={`cur__card${img.curated ? ' cur__card--curated' : ''}`}
-              onClick={() => openPopup(img)}
-            >
-              {/* Image area — fully transparent, gradient shows through */}
-              <div
-                className="cur__card-img"
-                style={{
-                  background: `${p.bg}33`,
-                }}
+            <li key={img.id} role="listitem">
+              <button
+                className={`cur__card${img.curated ? ' cur__card--curated' : ''}`}
+                onClick={e => openPopup(img, e.currentTarget)}
+                aria-label={`${img.label} — ${img.location}${img.curated ? ' (annotated)' : ' (pending)'}`}
               >
-                <PersonIcon shape={img.shape} color={p.fg} size={0.7} />
-
-                {/* ✅ Annotated overlay */}
-                {img.curated && (
-                  <div className="cur__card-check">✅</div>
-                )}
-
-                {/* Hover tooltip — only for annotated images */}
-                {img.curated && ann && (
-                  <div className="cur__card-tooltip">
-                    <div className="cur__tooltip-row">
-                      <span className="cur__tooltip-key">Gender</span>
-                      <span className="cur__tooltip-val">{ANN_LABELS.gender[ann.gender] || '—'}</span>
+                <div className="cur__card-img" style={{ background: `${p.bg}33` }}>
+                  <PersonIcon shape={img.shape} color={p.fg} size={0.7} />
+                  {img.curated && <div className="cur__card-check" aria-hidden="true">✅</div>}
+                  {img.curated && a && (
+                    <div className="cur__card-tooltip" role="tooltip">
+                      <div className="cur__tooltip-row">
+                        <span className="cur__tooltip-key">Gender</span>
+                        <span className="cur__tooltip-val">{ANN_LABELS.gender[a.gender] || '—'}</span>
+                      </div>
+                      <div className="cur__tooltip-row">
+                        <span className="cur__tooltip-key">Age</span>
+                        <span className="cur__tooltip-val">{ANN_LABELS.age[a.age] || '—'}</span>
+                      </div>
+                      <div className="cur__tooltip-row">
+                        <span className="cur__tooltip-key">Staff</span>
+                        <span className="cur__tooltip-val">{ANN_LABELS.staff[a.staff] || '—'}</span>
+                      </div>
+                      <div className="cur__tooltip-row">
+                        <span className="cur__tooltip-key">ID</span>
+                        <span className="cur__tooltip-val">{ANN_LABELS.id[a.id] || '—'}</span>
+                      </div>
                     </div>
-                    <div className="cur__tooltip-row">
-                      <span className="cur__tooltip-key">Age</span>
-                      <span className="cur__tooltip-val">{ANN_LABELS.age[ann.age] || '—'}</span>
-                    </div>
-                    <div className="cur__tooltip-row">
-                      <span className="cur__tooltip-key">Staff</span>
-                      <span className="cur__tooltip-val">{ANN_LABELS.staff[ann.staff] || '—'}</span>
-                    </div>
-                    <div className="cur__tooltip-row">
-                      <span className="cur__tooltip-key">ID</span>
-                      <span className="cur__tooltip-val">{ANN_LABELS.id[ann.id] || '—'}</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Card footer */}
-              <div className="cur__card-footer">
-                <span className="cur__card-label">{img.label}</span>
-                <span className="cur__card-loc">{img.location}</span>
-              </div>
-            </div>
+                  )}
+                </div>
+                <div className="cur__card-footer">
+                  <span className="cur__card-label">{img.label}</span>
+                  <span className="cur__card-loc">{img.location}</span>
+                </div>
+              </button>
+            </li>
           );
         })}
-
         {filtered.length === 0 && (
-          <div className="cur__gallery-empty">
-            <span>No images match your filter</span>
-          </div>
+          <li className="cur__gallery-empty">No images match your filter</li>
         )}
-      </div>
+      </ul>
 
-      {/* ══════════ ANNOTATION POPUP ══════════ */}
+      {/* ── Annotation Popup ── */}
       {popup && (
-        <div className="cur__overlay" onClick={closePopup}>
-          <div className="cur__popup" onClick={e => e.stopPropagation()}>
+        <div
+          className="cur__overlay"
+          onClick={closeViaBackdrop}
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Annotate ${popup.label}`}
+        >
+          <div className="cur__popup">
 
-            {/* Popup header */}
-            <div className="cur__popup-hd">
-              <div className="cur__popup-title-group">
-                <span className="cur__popup-label">{popup.label}</span>
-                <span className="cur__popup-loc">📍 {popup.location}</span>
-                <span className="cur__popup-time">🕐 {popup.timestamp}</span>
+            {/* Left — image */}
+            <div className="cur__popup-img" style={{ background: `${palette(popup).bg}44` }}>
+              <button
+                className="cur__popup-arrow cur__popup-arrow--left"
+                aria-label="Previous image"
+                onClick={e => {
+                  e.stopPropagation();
+                  const idx = listRef.current.findIndex(i => i.id === popup.id);
+                  if (idx > 0) openPopup(listRef.current[idx - 1]);
+                }}
+              >‹</button>
+              <button
+                className="cur__popup-arrow cur__popup-arrow--right"
+                aria-label="Next image"
+                onClick={e => {
+                  e.stopPropagation();
+                  const idx = listRef.current.findIndex(i => i.id === popup.id);
+                  if (idx < listRef.current.length - 1) openPopup(listRef.current[idx + 1]);
+                }}
+              >›</button>
+
+              <div className="cur__popup-scene">
+                <div className="cur__popup-wall"  style={{ background: palette(popup).fg + '08' }} />
+                <div className="cur__popup-floor" style={{ background: palette(popup).fg + '15' }} />
+                <div className="cur__popup-person">
+                  <PersonIcon shape={popup.shape} color={palette(popup).fg} size={1.6} />
+                </div>
+                <div className="cur__popup-bbox" style={{ borderColor: palette(popup).fg + '90' }} aria-hidden="true"/>
               </div>
-              <div className="cur__popup-hd-right">
-                <span className="cur__popup-nav">
-                  {list.findIndex(i => i.id === popup.id) + 1} / {list.length}
+
+              <div className="cur__popup-img-meta">
+                <span className="cur__popup-img-label">{popup.label}</span>
+                <span className="cur__popup-img-loc">📍 {popup.location}</span>
+                <span className="cur__popup-img-nav">
+                  {listRef.current.findIndex(i => i.id === popup.id) + 1} / {listRef.current.length}
                 </span>
-                <button className="cur__popup-close" onClick={closePopup}>✕</button>
               </div>
             </div>
 
-            <div className="cur__popup-body">
-
-              {/* Image preview */}
-              <div className="cur__popup-img" style={{ background: `${palette(popup).bg}44` }}>
-                <div className="cur__popup-scene">
-                  <div className="cur__popup-wall"  style={{ background: palette(popup).fg + '08' }} />
-                  <div className="cur__popup-floor" style={{ background: palette(popup).fg + '15' }} />
-                  <div className="cur__popup-person">
-                    <PersonIcon shape={popup.shape} color={palette(popup).fg} size={1.4} />
-                  </div>
-                  <div className="cur__popup-bbox" style={{ borderColor: palette(popup).fg + '90' }} />
-                  {popup.curated && <div className="cur__popup-curated-badge">✅ Annotated</div>}
-                </div>
+            {/* Right — annotation panel */}
+            <div className="cur__popup-panel">
+              <div className="cur__popup-panel-hd">
+                <span className="cur__popup-panel-title" id="popup-title">Annotations</span>
+                <button
+                  ref={firstFocusRef}
+                  className="cur__popup-close"
+                  onClick={tryClose}
+                  aria-label="Close annotation popup"
+                >✕</button>
               </div>
 
-              {/* Annotation panel */}
-              <div className="cur__popup-panel">
-                <p className="cur__popup-panel-hint">
-                  Select annotations below or use keyboard shortcuts
-                </p>
-
+              <div className="cur__popup-groups" aria-labelledby="popup-title">
                 {ANNOTATION_GROUPS.map(g => (
                   <div key={g.field} className="cur__popup-group">
                     <div className="cur__popup-group-hd">
-                      <span className="cur__popup-group-title">{g.title}</span>
-                      <div className="cur__popup-keys">
-                        {g.keys.map(k => <span key={k} className="cur__kbdkey">{k}</span>)}
-                      </div>
+                      <span className="cur__popup-group-icon" aria-hidden="true">{g.icon}</span>
+                      <span className="cur__popup-group-title" id={`group-${g.field}`}>{g.title}</span>
                     </div>
-                    <div className={`cur__popup-opts${g.grid ? ' cur__popup-opts--grid' : ''}`}>
+                    <div className="cur__popup-opts" role="group" aria-labelledby={`group-${g.field}`}>
                       {g.options.map(o => (
                         <button
                           key={o.key}
-                          className={`cur__popup-opt${ann[g.field] === o.key ? ' cur__popup-opt--active' : ''}`}
+                          className={`cur__popup-opt${ann[g.field] === o.key ? ' cur__popup-opt--active' : ''}${o.isReject ? ' cur__popup-opt--reject' : ''}`}
+                          style={{ '--opt-color': o.color }}
                           onClick={() => toggle(g.field, o.key)}
+                          aria-pressed={ann[g.field] === o.key}
+                          title={`Shortcut: ${o.shortcut}`}
                         >
-                          <span className="cur__popup-opt-label">{o.label}</span>
-                          <span className="cur__kbdkey cur__kbdkey--sm">{o.shortcut}</span>
+                          {o.label}
                         </button>
                       ))}
                     </div>
                   </div>
                 ))}
+              </div>
 
-                <div className="cur__popup-actions">
-                  <button className="cur__popup-skip" onClick={closePopup}>Skip</button>
-                  <button className="cur__popup-save" onClick={saveAndNext}>
-                    Save &amp; Next
-                    <span className="cur__kbdkey cur__kbdkey--dark">Enter</span>
+              <div className="cur__popup-actions">
+                {saveError && (
+                  <div className="cur__popup-save-error" role="alert">
+                    ⚠ Select at least one annotation before saving
+                  </div>
+                )}
+                <div className="cur__popup-actions-row">
+                  <button className="cur__popup-save-next" onClick={doSaveAndNext}>
+                    Save &amp; next →
+                  </button>
+                  <button
+                    ref={lastFocusRef}
+                    className="cur__popup-accept-all"
+                    onClick={acceptAll}
+                  >
+                    Accept all suggestions ✓
                   </button>
                 </div>
               </div>

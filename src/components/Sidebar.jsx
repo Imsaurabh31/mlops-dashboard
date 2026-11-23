@@ -40,8 +40,8 @@ export default function Sidebar() {
 
   return (
     <aside className="sidebar">
-      {/* ── Brand ── */}
-      <div className="sidebar__brand" onClick={() => navigate('/')}>
+      {/* ── Brand — button for keyboard accessibility ── */}
+      <button className="sidebar__brand" onClick={() => navigate('/')}>
         <div className="sidebar__brand-icon">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
             <circle cx="12" cy="12" r="10" stroke="rgba(255,255,255,0.4)" strokeWidth="1.5"/>
@@ -52,13 +52,13 @@ export default function Sidebar() {
           <span className="sidebar__brand-name">OLY VISION</span>
           <span className="sidebar__brand-tag">MLOps</span>
         </div>
-      </div>
+      </button>
 
       {/* ── Section label ── */}
       <div className="sidebar__section-label">MENU</div>
 
       {/* ── Navigation ── */}
-      <nav className="sidebar__nav">
+      <nav className="sidebar__nav" aria-label="Main navigation">
         {NAV.map(({ to, icon, label }) => (
           <NavLink
             key={to}
@@ -68,7 +68,7 @@ export default function Sidebar() {
               `sidebar__link${isActive ? ' sidebar__link--active' : ''}`
             }
           >
-            <span className="sidebar__link-icon">{icon}</span>
+            <span className="sidebar__link-icon" aria-hidden="true">{icon}</span>
             <span className="sidebar__link-label">{label}</span>
           </NavLink>
         ))}
@@ -77,28 +77,21 @@ export default function Sidebar() {
       {/* ── Divider ── */}
       <div className="sidebar__divider" />
 
-      {/* ── Quick info ── */}
-      <div className="sidebar__info-block">
-        <div className="sidebar__info-row">
-          <span className="sidebar__info-dot sidebar__info-dot--green" />
-          <span className="sidebar__info-label">9,312 images curated</span>
-        </div>
-        <div className="sidebar__info-row">
-          <span className="sidebar__info-dot sidebar__info-dot--blue" />
-          <span className="sidebar__info-label">1 training job running</span>
-        </div>
-      </div>
-
       {/* ── Footer ── */}
       <div className="sidebar__footer">
-        <div className="sidebar__user">
-          <div className="sidebar__avatar">A</div>
+        <div className="sidebar__user" aria-label="Signed in as admin">
+          <div className="sidebar__avatar" aria-hidden="true">A</div>
           <div className="sidebar__user-info">
             <span className="sidebar__user-name">admin</span>
             <span className="sidebar__user-role">Administrator</span>
           </div>
         </div>
-        <button className="sidebar__logout">
+        {/* Sign out: shows a coming-soon tooltip since auth is not yet implemented */}
+        <button
+          className="sidebar__logout"
+          title="Authentication not yet implemented"
+          onClick={() => alert('Sign out will be available once authentication is implemented.')}
+        >
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/>
           </svg>

@@ -1,4 +1,6 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { batchesApi } from '../api/client';
+import Modal from '../components/Modal';
 import './Admin.css';
 
 /* ── Seed data ── */
@@ -37,6 +39,14 @@ export default function Admin() {
   const [tab, setTab]         = useState('Batch Assignments');
   const [batches, setBatches] = useState(SEED_BATCHES);
   const [nextId, setNextId]   = useState(7);
+  const [apiReady, setApiReady] = useState(false);
+
+  /* ── Load batches from backend on mount ── */
+  useEffect(() => {
+    batchesApi.list()
+      .then(data => { setBatches(data); setApiReady(true); })
+      .catch(() => setApiReady(false)); // fall back to seed data silently
+  }, []);
 
   /* ── Create modal ── */
   const [showCreate, setShowCreate] = useState(false);
@@ -81,15 +91,15 @@ export default function Admin() {
     else if (batches.some((b) => b.name.toLowerCase() === f.name.trim().toLowerCase() && b.id !== editBatch?.id))
                                     e.name   = 'Batch name already exists';
     if (!f.client.trim())           e.client = 'Client is required';
-    if (!f.images || Number(f.images) < 1)
-                                    e.images = 'Enter a valid image count';
+    if (!f.images || !Number.isInteger(Number(f.images)) || Number(f.images) < 1)
+                                    e.images = 'Enter a valid whole number';
     return e;
   };
 
   /* ── Create ── */
   const openCreate = () => { setForm(EMPTY_FORM); setErrors({}); setShowCreate(true); };
 
-  const submitCreate = (e) => {
+  const submitCreate = async (e) => {
     e.preventDefault();
     const errs = validate(form);
     if (Object.keys(errs).length) {
@@ -99,21 +109,42 @@ export default function Admin() {
       return;
     }
 
-    const newBatch = {
-      id:       nextId,
-      name:     form.name.trim(),
-      client:   form.client.trim(),
-      assigned: form.assignee || null,
-      images:   Number(form.images),
-      pct:      0,
-      status:   form.assignee ? 'in-progress' : 'unassigned',
-    };
-    setBatches((prev) => [newBatch, ...prev]);
-    setNextId((n) => n + 1);
-    setShowCreate(false);
-    setForm(EMPTY_FORM);
-    setErrors({});
-    showToast(`✅ "${newBatch.name}" created successfully`);
+    try {
+      let newBatch;
+      if (apiReady) {
+        // Use backend API
+        newBatch = await batchesApi.create({
+          name:     form.name.trim(),
+          client:   form.client.trim(),
+          assignee: form.assignee || null,
+          images:   Math.floor(Number(form.images)),
+        });
+      } else {
+        // Offline fallback
+        newBatch = {
+          id:       nextId,
+          name:     form.name.trim(),
+          client:   form.client.trim(),
+          assigned: form.assignee || null,
+          images:   Math.floor(Number(form.images)),
+          pct:      0,
+          status:   form.assignee ? 'in-progress' : 'unassigned',
+          _isNew:   true,
+        };
+        setNextId((n) => n + 1);
+      }
+      newBatch._isNew = true;
+      setBatches((prev) => [newBatch, ...prev]);
+      setTimeout(() => {
+        setBatches((prev) => prev.map(b => b.id === newBatch.id ? { ...b, _isNew: false } : b));
+      }, 2000);
+      setShowCreate(false);
+      setForm(EMPTY_FORM);
+      setErrors({});
+      showToast(`✅ "${newBatch.name}" created successfully`);
+    } catch (err) {
+      setErrors({ name: err.message || 'Failed to create batch' });
+    }
   };
 
   /* ── Edit ── */
@@ -123,7 +154,7 @@ export default function Admin() {
     setEditErrors({});
   };
 
-  const submitEdit = (e) => {
+  const submitEdit = async (e) => {
     e.preventDefault();
     const errs = validate(editForm);
     if (Object.keys(errs).length) {
@@ -133,54 +164,84 @@ export default function Admin() {
       return;
     }
 
-    setBatches((prev) => prev.map((b) =>
-      b.id === editBatch.id
-        ? {
-            ...b,
+    try {
+      const updated = apiReady
+        ? await batchesApi.update(editBatch.id, {
+            name:     editForm.name.trim(),
+            client:   editForm.client.trim(),
+            assignee: editForm.assignee,  // empty string = unassign
+            images:   Number(editForm.images),
+          })
+        : {
+            ...editBatch,
             name:     editForm.name.trim(),
             client:   editForm.client.trim(),
             assigned: editForm.assignee || null,
             images:   Number(editForm.images),
-            status:   editForm.assignee ? (b.pct === 100 ? 'completed' : 'in-progress') : 'unassigned',
-          }
-        : b
-    ));
-    showToast(`✏️ "${editForm.name}" updated`);
-    setEditBatch(null);
+            status:   editForm.assignee ? (editBatch.pct === 100 ? 'completed' : 'in-progress') : 'unassigned',
+          };
+
+      setBatches((prev) => prev.map((b) => b.id === editBatch.id ? updated : b));
+      showToast(`✏️ "${updated.name}" updated`);
+      setEditBatch(null);
+    } catch (err) {
+      setEditErrors({ name: err.message || 'Failed to update batch' });
+    }
   };
 
   /* ── Delete ── */
   const confirmDelete = (id) => setDeletingId(id);
 
-  const doDelete = () => {
-    const name = batches.find((b) => b.id === deletingId)?.name;
-    setBatches((prev) => prev.filter((b) => b.id !== deletingId));
-    setDeletingId(null);
-    showToast(`🗑 "${name}" deleted`, 'danger');
+  const doDelete = async () => {
+    const batch = batches.find((b) => b.id === deletingId);
+    try {
+      if (apiReady) await batchesApi.delete(deletingId);
+      setBatches((prev) => prev.filter((b) => b.id !== deletingId));
+      setDeletingId(null);
+      showToast(`🗑 "${batch?.name}" deleted`, 'danger');
+    } catch (err) {
+      showToast(`❌ Delete failed: ${err.message}`, 'danger');
+      setDeletingId(null);
+    }
   };
 
-  /* ── Field helpers ── */
-  const field = (label, key, type, ph, f, setF, errs, setErrs) => (
-    <div className="adm-field" key={key}>
-      <label className="adm-field__label">{label}</label>
-      <input
-        className={`adm-field__input${errs[key] ? ' adm-field__input--error' : ''}`}
-        type={type} placeholder={ph}
-        value={f[key]}
-        onChange={(e) => {
-          setF((prev) => ({ ...prev, [key]: e.target.value }));
-          if (errs[key]) setErrs((p) => ({ ...p, [key]: '' }));
-        }}
-        required
-      />
-      {errs[key] && <span className="adm-field__error">{errs[key]}</span>}
-    </div>
-  );
+  /* ── Field helpers — stable htmlFor using key (not random) ── */
+  const field = (label, key, type, ph, f, setF, errs, setErrs) => {
+    const inputId = `adm-field-${key}`;   // stable — never regenerated
+    return (
+      <div className="adm-field" key={key}>
+        <label className="adm-field__label" htmlFor={inputId}>{label}</label>
+        <input
+          id={inputId}
+          className={`adm-field__input${errs[key] ? ' adm-field__input--error' : ''}`}
+          type={type} placeholder={ph}
+          value={f[key]}
+          onChange={(e) => {
+            setF((prev) => ({ ...prev, [key]: e.target.value }));
+            if (errs[key]) setErrs((p) => ({ ...p, [key]: '' }));
+          }}
+          required
+          aria-invalid={!!errs[key]}
+          aria-describedby={errs[key] ? `${inputId}-err` : undefined}
+        />
+        {errs[key] && (
+          <span id={`${inputId}-err`} className="adm-field__error" role="alert">{errs[key]}</span>
+        )}
+      </div>
+    );
+  };
 
   const assigneeSelect = (f, setF) => (
     <div className="adm-field">
-      <label className="adm-field__label">Assign To <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(optional)</span></label>
-      <select className="adm-field__input" value={f.assignee} onChange={(e) => setF((prev) => ({ ...prev, assignee: e.target.value }))}>
+      <label className="adm-field__label" htmlFor="adm-assignee">
+        Assign To <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(optional)</span>
+      </label>
+      <select
+        id="adm-assignee"
+        className="adm-field__input"
+        value={f.assignee}
+        onChange={(e) => setF((prev) => ({ ...prev, assignee: e.target.value }))}
+      >
         <option value="">— Unassigned —</option>
         {USERS.filter((u) => u.role === 'Curator').map((u) => (
           <option key={u.email} value={u.email}>{u.name} ({u.email})</option>
@@ -245,7 +306,7 @@ export default function Admin() {
             </thead>
             <tbody>
               {batches.map((b) => (
-                <tr key={b.id} className={b.id === nextId - 1 ? 'adm__row--new' : ''}>
+                <tr key={b.id} className={b._isNew ? 'adm__row--new' : ''}>
                   <td><span className="chip">📦 {b.name}</span></td>
                   <td style={{ fontWeight: 500, color: 'var(--text-primary)' }}>{b.client}</td>
                   <td>
@@ -299,7 +360,13 @@ export default function Admin() {
         <div className="card" style={{ overflow: 'hidden' }}>
           <div className="adm__tbl-hd">
             <h3 className="adm__tbl-title">User Management</h3>
-            <button className="btn btn--primary btn--sm">+ Add User</button>
+            <button
+              className="btn btn--primary btn--sm"
+              onClick={() => alert('User creation will be available once the authentication backend is connected.')}
+              title="Requires backend"
+            >
+              + Add User
+            </button>
           </div>
           <table className="tbl">
             <thead>
@@ -325,8 +392,19 @@ export default function Admin() {
                   </td>
                   <td>
                     <div style={{ display: 'flex', gap: 5 }}>
-                      <button className="btn btn--ghost btn--sm">Edit</button>
-                      <button className="btn btn--ghost btn--sm">Assign</button>
+                      <button
+                        className="btn btn--ghost btn--sm"
+                        onClick={() => alert(`Edit user "${u.name}" — available once backend is connected.`)}
+                        title="Requires backend"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        className="btn btn--ghost btn--sm"
+                        onClick={() => alert(`Assign batches to "${u.name}" — use the Batch Assignments tab.`)}
+                      >
+                        Assign
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -339,137 +417,122 @@ export default function Admin() {
       {/* ══════════════════════════════════
           TAB: Progress Overview
       ══════════════════════════════════ */}
-      {tab === 'Progress Overview' && (
-        <div className="adm__progress-view">
-          <div className="card" style={{ overflow: 'hidden', marginBottom: 16 }}>
-            <div className="adm__tbl-hd">
-              <h3 className="adm__tbl-title">Curator Performance</h3>
-            </div>
-            <div className="adm__perf-list">
-              {USERS.filter((u) => u.role === 'Curator').map((u) => {
-                const pct = Math.round((u.curated / 600) * 100);
-                return (
-                  <div key={u.email} className="adm__perf-row">
-                    <div className="adm__user-cell" style={{ minWidth: 180 }}>
-                      <div className="adm__avatar">{u.name[0]}</div>
-                      <div>
-                        <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-primary)' }}>{u.name}</div>
-                        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{u.curated.toLocaleString()} images</div>
+      {tab === 'Progress Overview' && (() => {
+        const curators    = USERS.filter((u) => u.role === 'Curator');
+        const totalCurated = curators.reduce((s, u) => s + u.curated, 0);
+        const avgCurated  = curators.length ? Math.round(totalCurated / curators.length) : 0;
+        const topCurator  = [...curators].sort((a, b) => b.curated - a.curated)[0];
+        const totalImages = batches.reduce((s, b) => s + b.images, 0);
+        const derivedCurated = batches.reduce((s, b) => s + Math.round(b.images * b.pct / 100), 0);
+        const overallPct  = totalImages ? ((derivedCurated / totalImages) * 100).toFixed(1) : '0';
+        return (
+          <div className="adm__progress-view">
+            <div className="card" style={{ overflow: 'hidden', marginBottom: 16 }}>
+              <div className="adm__tbl-hd">
+                <h3 className="adm__tbl-title">Curator Performance</h3>
+              </div>
+              <div className="adm__perf-list">
+                {curators.map((u) => {
+                  const pct = topCurator?.curated
+                    ? Math.round((u.curated / topCurator.curated) * 100)
+                    : 0;
+                  return (
+                    <div key={u.email} className="adm__perf-row">
+                      <div className="adm__user-cell" style={{ minWidth: 180 }}>
+                        <div className="adm__avatar">{u.name[0]}</div>
+                        <div>
+                          <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-primary)' }}>{u.name}</div>
+                          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{u.curated.toLocaleString()} images</div>
+                        </div>
                       </div>
+                      <div className="progress-bar-wrap" style={{ flex: 1 }}>
+                        <div className="progress-bar" style={{
+                          width: `${pct}%`,
+                          background: u.active ? 'var(--accent-blue)' : 'var(--border-strong)',
+                        }} />
+                      </div>
+                      <span className="adm__perf-pct">{pct}%</span>
+                      <span className={`badge badge--${u.active ? 'green' : 'gray'}`}>{u.active ? 'Active' : 'Inactive'}</span>
                     </div>
-                    <div className="progress-bar-wrap" style={{ flex: 1 }}>
-                      <div className="progress-bar" style={{
-                        width: `${pct}%`,
-                        background: u.active ? 'var(--accent-blue)' : 'var(--border-strong)',
-                      }} />
-                    </div>
-                    <span className="adm__perf-pct">{pct}%</span>
-                    <span className={`badge badge--${u.active ? 'green' : 'gray'}`}>{u.active ? 'Active' : 'Inactive'}</span>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
+            </div>
+            {/* Summary cards — all derived from live batch/user data */}
+            <div className="adm__summary">
+              {[
+                { label: 'Avg. per Curator',  value: avgCurated.toLocaleString(), sub: 'images curated',           color: 'var(--accent-blue)'   },
+                { label: 'Top Curator',        value: topCurator?.name ?? '—',    sub: `${topCurator?.curated ?? 0} images`, color: 'var(--accent-purple)' },
+                { label: 'Overall Progress',   value: `${overallPct}%`,           sub: `${derivedCurated.toLocaleString()} / ${totalImages.toLocaleString()}`, color: 'var(--accent-green)' },
+                { label: 'Active Curators',    value: curators.filter(u => u.active).length.toString(), sub: `of ${curators.length} total`, color: 'var(--accent-yellow)' },
+              ].map((s) => (
+                <div key={s.label} className="adm-summary-card card">
+                  <span className="adm-summary-card__label">{s.label}</span>
+                  <span className="adm-summary-card__val" style={{ color: s.color }}>{s.value}</span>
+                  <span className="adm-summary-card__sub">{s.sub}</span>
+                </div>
+              ))}
             </div>
           </div>
-          <div className="adm__summary">
-            {[
-              { label: 'Avg. per Curator',  value: '306',        sub: 'images curated',  color: 'var(--accent-blue)'   },
-              { label: 'Top Curator',        value: 'Alice Chen', sub: '500 images',      color: 'var(--accent-purple)' },
-              { label: 'Overall Progress',   value: '74.6%',      sub: '9,312 / 12,480', color: 'var(--accent-green)'  },
-              { label: 'Est. Completion',    value: '2 days',     sub: 'at current rate', color: 'var(--accent-yellow)' },
-            ].map((s) => (
-              <div key={s.label} className="adm-summary-card card">
-                <span className="adm-summary-card__label">{s.label}</span>
-                <span className="adm-summary-card__val" style={{ color: s.color }}>{s.value}</span>
-                <span className="adm-summary-card__sub">{s.sub}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* ══════════════════════════════════
-          MODAL: Create Batch
-      ══════════════════════════════════ */}
+      {/* ── Create Batch Modal ── */}
       {showCreate && (
-        <div className="adm-modal-overlay" onClick={() => setShowCreate(false)}>
-          <div className="adm-modal card" onClick={(e) => e.stopPropagation()}>
-            <div className="adm-modal__hd">
-              <div>
-                <h3 className="adm-modal__title">Create New Batch</h3>
-                <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
-                  Fill in the details below to create a new annotation batch.
-                </p>
-              </div>
-              <button className="adm-modal__close" onClick={() => setShowCreate(false)}>✕</button>
-            </div>
-            <form className={`adm-modal__form${shakeCreate ? ' adm-modal__form--shake' : ''}`} onSubmit={submitCreate} noValidate>
-              {field('Batch Name',       'name',   'text',   'e.g. Batch-007', form, setForm, errors, setErrors)}
-              {field('Client',           'client', 'text',   'e.g. RetailCo',  form, setForm, errors, setErrors)}
-              {field('Number of Images', 'images', 'number', 'e.g. 500',       form, setForm, errors, setErrors)}
-              {assigneeSelect(form, setForm)}
-              <div className="adm-modal__actions">
-                <button type="button" className="btn btn--ghost" onClick={() => setShowCreate(false)}>Cancel</button>
-                <button type="submit" className="btn btn--primary">Create Batch</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* ══════════════════════════════════
-          MODAL: Edit Batch
-      ══════════════════════════════════ */}
-      {editBatch && (
-        <div className="adm-modal-overlay" onClick={() => setEditBatch(null)}>
-          <div className="adm-modal card" onClick={(e) => e.stopPropagation()}>
-            <div className="adm-modal__hd">
-              <div>
-                <h3 className="adm-modal__title">Edit Batch</h3>
-                <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
-                  Editing <strong>{editBatch.name}</strong>
-                </p>
-              </div>
-              <button className="adm-modal__close" onClick={() => setEditBatch(null)}>✕</button>
-            </div>
-            <form className={`adm-modal__form${shakeEdit ? ' adm-modal__form--shake' : ''}`} onSubmit={submitEdit} noValidate>
-              {field('Batch Name',       'name',   'text',   'e.g. Batch-007', editForm, setEditForm, editErrors, setEditErrors)}
-              {field('Client',           'client', 'text',   'e.g. RetailCo',  editForm, setEditForm, editErrors, setEditErrors)}
-              {field('Number of Images', 'images', 'number', 'e.g. 500',       editForm, setEditForm, editErrors, setEditErrors)}
-              {assigneeSelect(editForm, setEditForm)}
-              <div className="adm-modal__actions">
-                <button type="button" className="btn btn--ghost" onClick={() => setEditBatch(null)}>Cancel</button>
-                <button type="submit" className="btn btn--primary">Save Changes</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* ══════════════════════════════════
-          MODAL: Delete Confirm
-      ══════════════════════════════════ */}
-      {deletingId && (
-        <div className="adm-modal-overlay" onClick={() => setDeletingId(null)}>
-          <div className="adm-modal adm-modal--sm card" onClick={(e) => e.stopPropagation()}>
-            <div className="adm-modal__hd">
-              <h3 className="adm-modal__title">Delete Batch</h3>
-              <button className="adm-modal__close" onClick={() => setDeletingId(null)}>✕</button>
-            </div>
-            <div className="adm-delete-body">
-              <div className="adm-delete-icon">🗑</div>
-              <p className="adm-delete-text">
-                Are you sure you want to delete <strong>{batches.find((b) => b.id === deletingId)?.name}</strong>?
-              </p>
-              <p className="adm-delete-sub">This action cannot be undone.</p>
-            </div>
+        <Modal title="Create New Batch" titleId="create-modal-title" onClose={() => setShowCreate(false)}>
+          <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>
+            Fill in the details below to create a new annotation batch.
+          </p>
+          <form className={`adm-modal__form${shakeCreate ? ' adm-modal__form--shake' : ''}`} onSubmit={submitCreate} noValidate>
+            {field('Batch Name',       'name',   'text',   'e.g. Batch-007', form, setForm, errors, setErrors)}
+            {field('Client',           'client', 'text',   'e.g. RetailCo',  form, setForm, errors, setErrors)}
+            {field('Number of Images', 'images', 'number', 'e.g. 500',       form, setForm, errors, setErrors)}
+            {assigneeSelect(form, setForm)}
             <div className="adm-modal__actions">
-              <button className="btn btn--ghost" onClick={() => setDeletingId(null)}>Cancel</button>
-              <button className="btn" style={{ background: 'var(--accent-red)', color: '#fff', border: 'none' }} onClick={doDelete}>
-                Yes, Delete
-              </button>
+              <button type="button" className="btn btn--ghost" onClick={() => setShowCreate(false)}>Cancel</button>
+              <button type="submit" className="btn btn--primary">Create Batch</button>
             </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* ── Edit Batch Modal ── */}
+      {editBatch && (
+        <Modal title="Edit Batch" titleId="edit-modal-title" onClose={() => setEditBatch(null)}>
+          <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>
+            Editing <strong>{editBatch.name}</strong>
+          </p>
+          <form className={`adm-modal__form${shakeEdit ? ' adm-modal__form--shake' : ''}`} onSubmit={submitEdit} noValidate>
+            {field('Batch Name',       'name',   'text',   'e.g. Batch-007', editForm, setEditForm, editErrors, setEditErrors)}
+            {field('Client',           'client', 'text',   'e.g. RetailCo',  editForm, setEditForm, editErrors, setEditErrors)}
+            {field('Number of Images', 'images', 'number', 'e.g. 500',       editForm, setEditForm, editErrors, setEditErrors)}
+            {assigneeSelect(editForm, setEditForm)}
+            <div className="adm-modal__actions">
+              <button type="button" className="btn btn--ghost" onClick={() => setEditBatch(null)}>Cancel</button>
+              <button type="submit" className="btn btn--primary">Save Changes</button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* ── Delete Confirm Modal ── */}
+      {deletingId && (
+        <Modal title="Delete Batch" titleId="delete-modal-title" size="sm" onClose={() => setDeletingId(null)}>
+          <div className="adm-delete-body">
+            <div className="adm-delete-icon">🗑</div>
+            <p className="adm-delete-text">
+              Are you sure you want to delete <strong>{batches.find((b) => b.id === deletingId)?.name}</strong>?
+            </p>
+            <p className="adm-delete-sub">This action cannot be undone.</p>
           </div>
-        </div>
+          <div className="adm-modal__actions">
+            <button className="btn btn--ghost" onClick={() => setDeletingId(null)}>Cancel</button>
+            <button className="btn" style={{ background: 'var(--accent-red)', color: '#fff', border: 'none' }} onClick={doDelete}>
+              Yes, Delete
+            </button>
+          </div>
+        </Modal>
       )}
     </div>
   );
