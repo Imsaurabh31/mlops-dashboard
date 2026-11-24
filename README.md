@@ -1,6 +1,6 @@
 # OLY VISION — MLOps Dashboard
 
-> **Stage 1 & 2** — React frontend + FastAPI backend
+> **Stage 1, 2 & 3** — React frontend + FastAPI backend
 > Built by **Saurabh Kumar**
 
 ---
@@ -42,9 +42,13 @@ uvicorn app.main:app --reload --port 8000
 | SSE real-time training metrics | ✅ Live stream — no polling |
 | Annotation quality score | ✅ Backend API working |
 | Pluggable training scripts | ✅ Swap scripts without changing pipeline |
+| **Model auto-deployment** | ✅ **Stage 3 — working** |
+| **Deployment registry** | ✅ **Active deployments per model** |
+| **Rollback to previous version** | ✅ **One click rollback** |
+| **Health monitoring** | ✅ **Latency, uptime, requests/hr** |
+| **Deployment audit log** | ✅ **Every action recorded** |
 | Training page auto-trigger at 80% | ⚠️ Frontend simulation only |
 | Epoch metrics, charts | ⚠️ Mock data until real scripts arrive |
-| Deploy button | ⚠️ UI only — Stage 3 |
 | Authentication / roles | ❌ Not implemented yet |
 | Persistence | ❌ In-memory — needs database |
 | Real images | ❌ SVG silhouettes only |
@@ -65,6 +69,9 @@ Batch assignments with progress bars. Full CRUD connected to backend. Accessible
 
 ### Training
 Auto-trigger at 80% curation. Model cards (Gender, Age, Staff). **SSE real-time panel** with live accuracy/loss charts, epoch progress, terminal logs. Pluggable training scripts.
+
+### Deployment *(Stage 3)*
+Active deployment cards per model with health indicators. Deploy trained models, rollback to previous versions, stop endpoints. Deployment version history. Audit log of all actions.
 
 ---
 
@@ -108,6 +115,19 @@ Base URL: `http://localhost:8000/api`
 | POST | `/quality/{id}/approve` | Approve flagged image |
 | POST | `/quality/{id}/flag` | Manually flag image |
 
+### Deployment *(Stage 3)*
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/deploy/` | List all deployments |
+| GET | `/deploy/active` | Active deployment per model |
+| GET | `/deploy/summary` | Health overview stats |
+| GET | `/deploy/log` | Deployment audit log |
+| GET | `/deploy/{id}` | Single deployment detail |
+| **POST** | **`/deploy/{job_id}/deploy`** | **Deploy a trained model** |
+| **POST** | **`/deploy/{dep_id}/rollback`** | **Rollback to previous version** |
+| POST | `/deploy/{dep_id}/stop` | Stop a deployment (requires confirm) |
+| POST | `/deploy/health/refresh` | Refresh health checks |
+
 ---
 
 ## Project Structure
@@ -129,27 +149,32 @@ mlops-dashboard/              ← repo root (frontend lives here)
 │   │   ├── Curation.jsx/css
 │   │   ├── Training.jsx/css
 │   │   ├── Admin.jsx/css
+│   │   ├── Deployment.jsx/css ← Stage 3
 │   │   └── NotFound.jsx
 │   ├── index.css             ← design tokens (CSS variables)
 │   ├── App.jsx               ← HashRouter + routes + 404
 │   └── main.jsx
 ├── backend/
 │   ├── app/
-│   │   ├── main.py           ← FastAPI app + CORS
+│   │   ├── main.py                    ← FastAPI app + CORS
 │   │   ├── models/
-│   │   │   └── schemas.py    ← Pydantic models
+│   │   │   └── schemas.py             ← Pydantic models
 │   │   ├── routers/
-│   │   │   ├── images.py     ← image endpoints
-│   │   │   ├── batches.py    ← batch CRUD + completion trigger
-│   │   │   ├── training.py   ← jobs, SSE stream, trigger
-│   │   │   └── quality.py    ← annotation quality scoring
+│   │   │   ├── images.py
+│   │   │   ├── batches.py             ← CRUD + completion trigger
+│   │   │   ├── training.py            ← jobs, SSE stream, trigger
+│   │   │   ├── quality.py             ← annotation quality scoring
+│   │   │   └── deployment.py          ← Stage 3 deployment endpoints
 │   │   └── services/
-│   │       ├── store.py           ← in-memory store
-│   │       ├── script_runner.py   ← pluggable script runner
-│   │       └── training_service.py ← job management + trigger
+│   │       ├── store.py               ← in-memory store
+│   │       ├── script_runner.py       ← pluggable script runner
+│   │       ├── training_service.py    ← job management + trigger
+│   │       ├── deployment_store.py    ← deployment registry
+│   │       └── deployment_service.py  ← auto-deploy, rollback, health
 │   ├── scripts/
-│   │   └── dummy_training.py ← swap this for real training script
-│   ├── verify.py             ← 18-test verification suite
+│   │   └── dummy_training.py          ← swap for real training scripts
+│   ├── verify.py                      ← 18-test suite (Stages 1 & 2)
+│   ├── verify_stage3.py               ← 11-test suite (Stage 3)
 │   └── requirements.txt
 ├── package.json
 ├── vite.config.js
@@ -189,11 +214,12 @@ DONE  <final_val_acc>
 
 ## Roadmap
 
-### Stage 3 — Model Auto Deployment
-- [ ] Deployment pipeline triggered by accuracy threshold
-- [ ] Endpoint registry with health monitoring
-- [ ] Rollback to previous version
-- [ ] Audit logs
+### Stage 3 — Model Auto Deployment ✅ Complete
+- [x] Deployment pipeline triggered by accuracy threshold
+- [x] Endpoint registry with health monitoring
+- [x] Rollback to previous version
+- [x] Deployment audit log
+- [x] Deploy / Rollback / Stop endpoints
 
 ### Stage 4 — MLOps Dashboard v2
 - [ ] Authentication and RBAC
@@ -202,3 +228,4 @@ DONE  <final_val_acc>
 - [ ] Real training scripts integration
 - [ ] WebSocket metrics from actual job runner
 - [ ] Model registry (artefacts, lineage)
+- [ ] Data protection (DPDP Act 2023 / GDPR)
