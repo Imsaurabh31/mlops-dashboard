@@ -3,17 +3,19 @@ import { useState } from 'react';
 import './Topbar.css';
 
 const PAGES = {
-  '/':         { title: 'Dashboard',      sub: 'Overview of your MLOps pipeline'           },
-  '/curation': { title: 'Curation',       sub: 'Annotate and verify VLM inference results'  },
-  '/admin':    { title: 'Admin Panel',    sub: 'Manage users, batches and curator progress' },
-  '/training': { title: 'Model Training', sub: 'Train and deploy classification models'     },
+  '/':           { title: 'Dashboard',      sub: 'Overview of your MLOps pipeline'           },
+  '/curation':   { title: 'Curation',       sub: 'Annotate and verify VLM inference results'  },
+  '/admin':      { title: 'Admin Panel',    sub: 'Manage users, batches and curator progress' },
+  '/training':   { title: 'Model Training', sub: 'Train and deploy classification models'     },
+  '/deployment': { title: 'Deployment',     sub: 'Manage and monitor live model deployments'  },
 };
 
 const BREADCRUMBS = {
-  '/':         [{ label: 'Home', to: '/' }],
-  '/curation': [{ label: 'Home', to: '/' }, { label: 'Curation' }],
-  '/admin':    [{ label: 'Home', to: '/' }, { label: 'Admin Panel' }],
-  '/training': [{ label: 'Home', to: '/' }, { label: 'Training' }],
+  '/':           [{ label: 'Home', to: '/' }],
+  '/curation':   [{ label: 'Home', to: '/' }, { label: 'Curation' }],
+  '/admin':      [{ label: 'Home', to: '/' }, { label: 'Admin Panel' }],
+  '/training':   [{ label: 'Home', to: '/' }, { label: 'Training' }],
+  '/deployment': [{ label: 'Home', to: '/' }, { label: 'Deployment' }],
 };
 
 /* Quick-nav: map search terms to routes */

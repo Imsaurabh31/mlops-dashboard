@@ -68,9 +68,18 @@ export const trainingApi = {
   getLogs:     (id)       => get(`/training/jobs/${id}/logs`),
   trigger:     (body)     => post('/training/trigger', body),
   status:      ()         => get('/training/status'),
-  /**
-   * Returns an EventSource connected to the SSE stream for a job.
-   * The caller is responsible for calling .close() when done.
-   */
-  streamJob: (id) => new EventSource(`${BASE}/training/jobs/${id}/stream`),
+  streamJob:   (id)       => new EventSource(`${BASE}/training/jobs/${id}/stream`),
+};
+
+// ── Deployment ────────────────────────────────────────────
+export const deployApi = {
+  list:          (status) => get(`/deploy/${status ? `?status=${status}` : ''}`),
+  active:        ()       => get('/deploy/active'),
+  summary:       ()       => get('/deploy/summary'),
+  get:           (id)     => get(`/deploy/${id}`),
+  deploy:        (jobId, actor = 'admin') => post(`/deploy/${jobId}/deploy`, { actor }),
+  rollback:      (depId, actor = 'admin') => post(`/deploy/${depId}/rollback`, { actor }),
+  stop:          (depId, actor = 'admin') => post(`/deploy/${depId}/stop`, { confirm: true, actor }),
+  refreshHealth: ()       => post('/deploy/health/refresh'),
+  log:           ()       => get('/deploy/log'),
 };

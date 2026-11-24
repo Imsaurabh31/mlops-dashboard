@@ -205,6 +205,18 @@ def run_script(model_id: str, job_id: str, epochs: int = TOTAL_EPOCHS) -> None:
             f'{"Ready for deployment." if exceeded else "Review required."}'
         )
 
+        # ── Auto-deploy if threshold met (Stage 3) ──
+        try:
+            from app.services.deployment_service import auto_deploy_if_eligible
+            dep = auto_deploy_if_eligible(model_id, job_id, final_val_acc, cfg['threshold'])
+            if dep:
+                job['deployment_id'] = dep['id']
+                job['logs'].append(f'[{_ts()}] 🚀 Auto-deployed as {dep["version"]} → {dep["endpoint"]}')
+            else:
+                job['logs'].append(f'[{_ts()}] ⚠️  Auto-deploy skipped — accuracy below threshold')
+        except Exception as deploy_err:
+            job['logs'].append(f'[{_ts()}] ⚠️  Auto-deploy error: {deploy_err}')
+
     except Exception as exc:
         elapsed_s = round(time.monotonic() - start_time)
         job['status']   = 'failed'

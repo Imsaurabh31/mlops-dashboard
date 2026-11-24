@@ -1,26 +1,25 @@
 """
-OLY VISION — MLOps Backend
+OLY VISION — MLOps Backend  v0.3.0
 FastAPI application entry point.
 
-Run with:
+Run:
     uvicorn app.main:app --reload --port 8000
 
-API docs:
+Docs:
     http://localhost:8000/docs
-    http://localhost:8000/redoc
 """
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routers import batches, training, images, quality
+from app.routers import images, batches, training, quality, deployment
 
 app = FastAPI(
     title='OLY VISION MLOps API',
-    description='Backend for the OLY VISION MLOps Dashboard.',
-    version='0.2.0',
+    description='Backend for the OLY VISION MLOps Dashboard — Stage 1, 2 & 3.',
+    version='0.3.0',
 )
 
-# ── CORS ────────────────────────────────────────────────────
+# ── CORS ─────────────────────────────────────────────────────
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -33,18 +32,19 @@ app.add_middleware(
     allow_headers=['*'],
 )
 
-# ── Routers ─────────────────────────────────────────────────
-app.include_router(images.router,   prefix='/api')
-app.include_router(batches.router,  prefix='/api')
-app.include_router(training.router, prefix='/api')
-app.include_router(quality.router,  prefix='/api')
+# ── Routers ───────────────────────────────────────────────────
+app.include_router(images.router,     prefix='/api')
+app.include_router(batches.router,    prefix='/api')
+app.include_router(training.router,   prefix='/api')
+app.include_router(quality.router,    prefix='/api')
+app.include_router(deployment.router, prefix='/api')
 
 
 @app.get('/')
 def root():
     return {
         'service': 'OLY VISION MLOps API',
-        'version': '0.2.0',
+        'version': '0.3.0',
         'docs':    '/docs',
         'status':  'running',
     }
