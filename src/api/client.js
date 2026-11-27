@@ -9,9 +9,13 @@
 const BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
 async function request(method, path, body) {
+  const token = localStorage.getItem('oly_token');
   const opts = {
     method,
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
   };
   if (body !== undefined) opts.body = JSON.stringify(body);
 
@@ -35,6 +39,17 @@ const get  = (path)        => request('GET',    path);
 const post = (path, body)  => request('POST',   path, body);
 const patch= (path, body)  => request('PATCH',  path, body);
 const del  = (path)        => request('DELETE', path);
+
+// ── Auth ──────────────────────────────────────────────────
+export const authApi = {
+  login:       (email, password) => post('/auth/login', { email, password }),
+  me:          ()                => get('/auth/me'),
+  permissions: ()                => get('/auth/permissions'),
+  logout:      ()                => post('/auth/logout'),
+  listUsers:   ()                => get('/auth/users'),
+  createUser:  (body)            => post('/auth/users', body),
+  updateUser:  (id, body)        => patch(`/auth/users/${id}`, body),
+};
 
 // ── Images ────────────────────────────────────────────────
 export const imagesApi = {

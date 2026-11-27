@@ -1,5 +1,6 @@
 import { useLocation, Link, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
+import { useAuth } from '../auth/AuthContext';
 import './Topbar.css';
 
 const PAGES = {
@@ -29,6 +30,7 @@ const SEARCH_ROUTES = [
 export default function Topbar() {
   const { pathname } = useLocation();
   const navigate     = useNavigate();
+  const { user }     = useAuth();
   const [query, setQuery] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
 
@@ -98,12 +100,17 @@ export default function Topbar() {
           )}
         </form>
 
-        {/* User */}
-        <div className="topbar__user" role="status" aria-label="Signed in as admin">
-          <div className="topbar__avatar" aria-hidden="true">A</div>
+        {/* User — real from AuthContext */}
+        <div className="topbar__user" role="status" aria-label={`Signed in as ${user?.name || 'admin'}`}>
+          <div className="topbar__avatar" aria-hidden="true"
+            style={{ background: user?.role === 'admin' ? '#7c3aed' : user?.role === 'viewer' ? '#0891b2' : '#2563eb' }}>
+            {user?.name?.[0]?.toUpperCase() || 'A'}
+          </div>
           <div className="topbar__user-info">
-            <span className="topbar__user-name">admin</span>
-            <span className="badge badge--blue" style={{ fontSize: '10px', padding: '1px 6px' }}>ADMIN</span>
+            <span className="topbar__user-name">{user?.name || 'admin'}</span>
+            <span className="badge badge--blue" style={{ fontSize: '10px', padding: '1px 6px', textTransform: 'uppercase' }}>
+              {user?.role || 'admin'}
+            </span>
           </div>
         </div>
       </div>

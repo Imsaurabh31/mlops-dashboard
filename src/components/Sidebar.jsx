@@ -1,4 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom';
+import { useAuth } from '../auth/AuthContext';
 import './Sidebar.css';
 
 const NAV = [
@@ -44,7 +45,21 @@ const NAV = [
 ];
 
 export default function Sidebar() {
-  const navigate = useNavigate();
+  const navigate       = useNavigate();
+  const { user, logout, can } = useAuth();
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login', { replace: true });
+  };
+
+  const ROLE_COLOR = { admin: '#7c3aed', curator: '#2563eb', viewer: '#0891b2' };
+
+  /* Filter nav based on user permissions */
+  const visibleNav = NAV.filter(item => {
+    const page = item.to === '/' ? 'dashboard' : item.to.replace('/', '');
+    return can(page);
+  });
 
   return (
     <aside className="sidebar">
@@ -67,7 +82,7 @@ export default function Sidebar() {
 
       {/* ── Navigation ── */}
       <nav className="sidebar__nav" aria-label="Main navigation">
-        {NAV.map(({ to, icon, label }) => (
+        {visibleNav.map(({ to, icon, label }) => (
           <NavLink
             key={to}
             to={to}
@@ -85,20 +100,27 @@ export default function Sidebar() {
       {/* ── Divider ── */}
       <div className="sidebar__divider" />
 
-      {/* ── Footer ── */}
+      {/* ── Footer — real user from AuthContext ── */}
       <div className="sidebar__footer">
-        <div className="sidebar__user" aria-label="Signed in as admin">
-          <div className="sidebar__avatar" aria-hidden="true">A</div>
+        <div className="sidebar__user" aria-label={`Signed in as ${user?.name || 'unknown'}`}>
+          <div
+            className="sidebar__avatar"
+            aria-hidden="true"
+            style={{ background: ROLE_COLOR[user?.role] || '#2563eb' }}
+          >
+            {user?.name?.[0]?.toUpperCase() || 'U'}
+          </div>
           <div className="sidebar__user-info">
-            <span className="sidebar__user-name">admin</span>
-            <span className="sidebar__user-role">Administrator</span>
+            <span className="sidebar__user-name">{user?.name || 'User'}</span>
+            <span className="sidebar__user-role" style={{ color: ROLE_COLOR[user?.role] }}>
+              {user?.role || '—'}
+            </span>
           </div>
         </div>
-        {/* Sign out: shows a coming-soon tooltip since auth is not yet implemented */}
         <button
           className="sidebar__logout"
-          title="Authentication not yet implemented"
-          onClick={() => alert('Sign out will be available once authentication is implemented.')}
+          onClick={handleLogout}
+          aria-label="Sign out"
         >
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/>

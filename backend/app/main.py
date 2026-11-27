@@ -12,11 +12,12 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.routers import images, batches, training, quality, deployment
+from app.routers import auth
 
 app = FastAPI(
     title='OLY VISION MLOps API',
-    description='Backend for the OLY VISION MLOps Dashboard — Stage 1, 2 & 3.',
-    version='0.3.0',
+    description='Backend for the OLY VISION MLOps Dashboard — Stage 1, 2, 3 & 4.',
+    version='0.4.0',
 )
 
 # ── CORS ─────────────────────────────────────────────────────
@@ -33,6 +34,7 @@ app.add_middleware(
 )
 
 # ── Routers ───────────────────────────────────────────────────
+app.include_router(auth.router,       prefix='/api')
 app.include_router(images.router,     prefix='/api')
 app.include_router(batches.router,    prefix='/api')
 app.include_router(training.router,   prefix='/api')
@@ -44,7 +46,7 @@ app.include_router(deployment.router, prefix='/api')
 def root():
     return {
         'service': 'OLY VISION MLOps API',
-        'version': '0.3.0',
+        'version': '0.4.0',
         'docs':    '/docs',
         'status':  'running',
     }
