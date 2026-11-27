@@ -139,13 +139,13 @@ except Exception as e:
 
 # 12. Create user (admin)
 try:
-    new = post('/auth/users', {}) if False else None
-    # Use auth header
-    b = json.dumps({'name':'Test User','email':'test@oly.com','password':'test1234','role':'viewer'}).encode()
-    req = urllib.request.Request(BASE+'/auth/users', data=b,
-          headers={'Content-Type':'application/json','Authorization':f'Bearer {admin_token}'},
-          method='POST')
-    r = urllib.request.urlopen(req, timeout=5)
+    b   = json.dumps({'name': 'Test User', 'email': 'test@oly.com', 'password': 'test1234', 'role': 'viewer'}).encode()
+    req = urllib.request.Request(
+        BASE + '/auth/users', data=b,
+        headers={'Content-Type': 'application/json', 'Authorization': f'Bearer {admin_token}'},
+        method='POST',
+    )
+    r  = urllib.request.urlopen(req, timeout=5)
     nu = json.loads(r.read())
     assert nu['email'] == 'test@oly.com'
     ok(12, f'Admin created user: {nu["name"]} ({nu["role"]})')
