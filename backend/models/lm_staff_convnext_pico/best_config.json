@@ -1,0 +1,25 @@
+{
+  "model": "convnext_pico.d1_in1k",
+  "image_size": [
+    224,
+    224
+  ],
+  "trial_id": 0,
+  "lr": 0.00015664275032504566,
+  "batch_size": 16,
+  "optimizer": "AdamW",
+  "epochs": 15,
+  "best_epoch": 13,
+  "val_metric_name": "f1_macro",
+  "val_metric": 0.9874980449676514,
+  "head_arch": "stock",
+  "pool_type": "avg",
+  "multi_scale": false,
+  "fusion_dim": 128,
+  "head_type": "linear",
+  "head_dropout": 0.0,
+  "drop_path_rate": 0.0,
+  "head_lr_mult": 1.0,
+  "tta_hflip": false,
+  "scratch": false
+}

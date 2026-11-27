@@ -8,3 +8,9 @@ dist
 # Local environment variables
 .env.local
 .env.production
+
+# ONNX model files (too large for GitHub)
+backend/models/**/*.onnx
+backend/models/**/*.png
+backend/models/**/*.log
+backend/models/**/*.csv

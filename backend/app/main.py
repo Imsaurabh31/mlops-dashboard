@@ -12,13 +12,41 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.routers import images, batches, training, quality, deployment
-from app.routers import auth
+from app.routers import auth, inference
 
 app = FastAPI(
     title='OLY VISION MLOps API',
     description='Backend for the OLY VISION MLOps Dashboard — Stage 1, 2, 3 & 4.',
     version='0.4.0',
 )
+
+# ── CORS ─────────────────────────────────────────────────────
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        'http://localhost:5173',
+        'http://localhost:4173',
+        'http://127.0.0.1:5173',
+    ],
+    allow_credentials=True,
+    allow_methods=['*'],
+    allow_headers=['*'],
+)
+
+
+# ── Database startup ──────────────────────────────────────────
+@app.on_event('startup')
+def startup_event():
+    from app.db.database import SessionLocal
+    from app.db.seed import init_db, seed_db
+    print('Initialising database…')
+    init_db()
+    db = SessionLocal()
+    try:
+        seed_db(db)
+    finally:
+        db.close()
+    print('Database ready.')
 
 # ── CORS ─────────────────────────────────────────────────────
 app.add_middleware(
@@ -40,6 +68,7 @@ app.include_router(batches.router,    prefix='/api')
 app.include_router(training.router,   prefix='/api')
 app.include_router(quality.router,    prefix='/api')
 app.include_router(deployment.router, prefix='/api')
+app.include_router(inference.router,  prefix='/api')
 
 
 @app.get('/')

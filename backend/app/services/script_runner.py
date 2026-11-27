@@ -29,14 +29,26 @@ from typing import Optional
 from app.services import store
 
 # ── Script registry ──────────────────────────────────────────
-# Change these paths to point to real training scripts when ready.
-# The script must follow the stdout interface defined above.
-_SCRIPTS_DIR = Path(__file__).parent.parent.parent / 'scripts'
+# Thiyagu's real training scripts (from lm_models_package)
+_SCRIPTS_DIR      = Path(__file__).parent.parent.parent / 'scripts'
+_TRAINING_SCRIPTS = _SCRIPTS_DIR / 'training_scripts'
+
+# Real script from Thiyagu's package — used for all 3 models
+_REAL_SCRIPT = _TRAINING_SCRIPTS / 'train_and_evaluate.py'
+
+# Fallback dummy script (used if real script not available)
+_DUMMY_SCRIPT = _SCRIPTS_DIR / 'dummy_training.py'
+
+def _get_script(model_id: str) -> Path:
+    """Return real script if available, else dummy."""
+    if _REAL_SCRIPT.exists():
+        return _REAL_SCRIPT
+    return _DUMMY_SCRIPT
 
 MODEL_SCRIPTS: dict[str, Path] = {
-    'gender': _SCRIPTS_DIR / 'dummy_training.py',
-    'age':    _SCRIPTS_DIR / 'dummy_training.py',
-    'staff':  _SCRIPTS_DIR / 'dummy_training.py',
+    'gender': _get_script('gender'),
+    'age':    _get_script('age'),
+    'staff':  _get_script('staff'),
 }
 
 # ── Model config (thresholds, task labels) ───────────────────

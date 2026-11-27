@@ -1,0 +1,17 @@
+# Versions actually used for the runs in this package (Python 3.12.3, CUDA 12.8 driver 570.211.01)
+torch==2.11.0
+torchvision==0.26.0
+timm==1.0.28
+torchmetrics==1.9.0
+onnx==1.22.0
+onnxruntime==1.29.0        # or onnxruntime-gpu
+mlxtend==0.25.0
+scikit-learn==1.9.0
+numpy==2.5.2
+Pillow==12.3.0
+matplotlib==3.11.1
+boto3                       # imported by train_and_evaluate.py (S3 upload is NOT called)
+# data prep only:
+albumentations==2.0.8
+tqdm
+scipy                       # cleanup_dataset.py only
