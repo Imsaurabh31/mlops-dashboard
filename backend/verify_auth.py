@@ -137,9 +137,11 @@ try:
 except Exception as e:
     fail(11, f'curator access guard: {e}')
 
-# 12. Create user (admin)
+# 12. Create user (admin) — use unique email each run
+import time as _time
+unique_email = f'test_{int(_time.time())}@oly.com'
 try:
-    b   = json.dumps({'name': 'Test User', 'email': 'test@oly.com', 'password': 'test1234', 'role': 'viewer'}).encode()
+    b   = json.dumps({'name': 'Test User', 'email': unique_email, 'password': 'test1234', 'role': 'viewer'}).encode()
     req = urllib.request.Request(
         BASE + '/auth/users', data=b,
         headers={'Content-Type': 'application/json', 'Authorization': f'Bearer {admin_token}'},
@@ -147,7 +149,7 @@ try:
     )
     r  = urllib.request.urlopen(req, timeout=5)
     nu = json.loads(r.read())
-    assert nu['email'] == 'test@oly.com'
+    assert nu['email'] == unique_email
     ok(12, f'Admin created user: {nu["name"]} ({nu["role"]})')
 except Exception as e:
     fail(12, f'create user: {e}')
